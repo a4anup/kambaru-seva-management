@@ -1,6 +1,6 @@
-import { BeneficiaryService, DevoteeService, EnrollmentService } from "@kambaru/backend";
 import { AppShell } from "@/components/AppShell";
 import { PoojaRegister } from "@/components/poojas/PoojaRegister";
+import { getBackendServices } from "@/lib/server/backend";
 
 export default async function PoojasPage({
   searchParams,
@@ -8,10 +8,11 @@ export default async function PoojasPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
+  const services = await getBackendServices();
   const [initialRows, devotees, beneficiaries] = await Promise.all([
-    EnrollmentService.listRegister(),
-    DevoteeService.listDirectory(),
-    BeneficiaryService.listAll(),
+    services.enrollments.listRegister(),
+    services.devotees.listDirectory(),
+    services.beneficiaries.listAll(),
   ]);
   return (
     <AppShell title="Poojas">

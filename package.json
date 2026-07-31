@@ -11,10 +11,9 @@
     "build": "npm run build -w @kambaru/frontend",
     "start": "npm run start -w @kambaru/frontend",
     "lint": "npm run lint -w @kambaru/frontend",
-    "fixtures:generate": "node backend/scripts/export-json-fixtures.mjs",
+    "typecheck": "tsc -p backend/tsconfig.json --noEmit && tsc -p frontend/tsconfig.json --noEmit",
     "supabase:start": "supabase start",
     "supabase:reset": "supabase db reset",
-    "supabase:push": "supabase db push",
-    "supabase:import-fixtures": "node database/scripts/import-json-to-supabase.mjs"
+    "supabase:push": "supabase db push"
   }
 }

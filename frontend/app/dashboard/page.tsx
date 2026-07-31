@@ -9,12 +9,12 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { DevoteeService, EnrollmentService } from "@kambaru/backend";
 import { AppShell } from "@/components/AppShell";
 import { MetricCard, type MetricTone } from "@/components/MetricCard";
 import { QuickActions } from "@/components/QuickActions";
 import { TodayPoojaTable } from "@/components/TodayPoojaTable";
 import { UpcomingPoojas, type UpcomingPooja } from "@/components/UpcomingPoojas";
+import { getBackendServices } from "@/lib/server/backend";
 
 function dateLabel(date: Date, options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -35,13 +35,14 @@ function dateInputValue(date: Date) {
 }
 
 export default async function DashboardPage() {
+  const services = await getBackendServices();
   const today = new Date();
-  const monday = EnrollmentService.mondayOfWeek(today);
+  const monday = services.enrollments.mondayOfWeek(today);
   const [todayRows, weekCount, directory, register] = await Promise.all([
-    EnrollmentService.listByDate(today),
-    EnrollmentService.countInRange(monday, 7),
-    DevoteeService.listDirectory(),
-    EnrollmentService.listRegister(),
+    services.enrollments.listByDate(today),
+    services.enrollments.countInRange(monday, 7),
+    services.devotees.listDirectory(),
+    services.enrollments.listRegister(),
   ]);
 
   const upcoming: UpcomingPooja[] = await Promise.all(Array.from({ length: 5 }, async (_, index) => {
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
       day: dateLabel(date, { day: "2-digit" }),
       month: dateLabel(date, { month: "short" }).toUpperCase(),
       weekday: dateLabel(date, { weekday: "short" }),
-      count: await EnrollmentService.countByDate(date),
+      count: await services.enrollments.countByDate(date),
       label: dateLabel(date, { weekday: "long", day: "2-digit", month: "short", year: "numeric" }),
       date: dateInputValue(date),
     };
@@ -68,7 +69,7 @@ export default async function DashboardPage() {
     { label: "This Week Poojas", value: weekCount, helper: "Poojas this week", icon: ClipboardList, tone: "amber" },
     { label: "Active Poojas", value: register.filter((pooja) => pooja.status === "active").length, helper: "All active pooja enrollments", icon: Sparkles, tone: "red" },
     { label: "Total Devotees", value: directory.length, helper: "Registered devotees", icon: Users, tone: "green" },
-    { label: "Labels Generated", value: 18, helper: "This month", icon: Printer, tone: "purple" },
+    { label: "Labels Ready", value: todayRows.length, helper: "Available for today's poojas", icon: Printer, tone: "purple" },
   ];
 
   const actions = [

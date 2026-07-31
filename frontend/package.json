@@ -10,10 +10,13 @@
   },
   "dependencies": {
     "@kambaru/backend": "^0.1.0",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.109.0",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

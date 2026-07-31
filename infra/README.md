@@ -28,8 +28,8 @@ notes on what the workflow does, e.g.:
 The free Supabase tier does not include automated daily backups. Plan: a weekly
 scheduled `pg_dump` (e.g. a GitHub Actions cron) exporting to a private storage
 location, so there's at least one restorable copy outside Supabase itself. Add
-the actual script/workflow here once `database/` is wired up — not needed until
-there's a real database to back up.
+the actual script/workflow here once the Supabase development environment is
+connected and restore testing can be automated.
 
 ## Environment variables
 

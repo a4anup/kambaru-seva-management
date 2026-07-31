@@ -270,10 +270,12 @@ occurrences / documents / audit) so it stays easy to extend later without becomi
 a tangle.
 
 In code, that boundary is a real npm-workspaces package split — `frontend/`
-(Next.js UI) depends on `backend/` (domain services/types) as a workspace
-dependency — with `database/` (Prisma, once phase 1b starts) and `infra/`
-(deployment/CI notes) alongside. Still one deployed app; see `AGENTS.md` "Repo
-layout" for the full tree and build commands.
+(Next.js UI) depends on `backend/` (trusted domain services/types) as a workspace
+dependency. The backend calls Supabase Postgres directly for ordinary reads and
+uses PostgreSQL RPC functions for transactional workflows. `supabase/` contains
+versioned SQL migrations, RLS policies, and exceptional Edge Functions. Still one
+deployed Next.js app; see
+`AGENTS.md` "Repo layout" for the full tree and build commands.
 
 ### 9.2 Stack
 
@@ -283,7 +285,7 @@ layout" for the full tree and build commands.
 | UI | **Tailwind CSS + shadcn/ui** | Fast, clean admin forms/tables without building a component library from scratch. |
 | Database | **PostgreSQL** | Real relational integrity for the devotee/address/enrollment/occurrence graph — this data model genuinely needs foreign keys and constraints. |
 | DB + Auth host | **Supabase (free tier)** | Free Postgres + email/password auth out of the box; see §9.4 for the tradeoff this implies. |
-| ORM | **Prisma** | Type-safe queries, versioned migrations. |
+| Data access | **Backend repository + Supabase PostgREST/RPC** | Keeps domain rules vendor-independent while using Supabase tables directly; versioned SQL migrations remain the database source of truth. |
 | Hosting | **Vercel (free/hobby tier)** | Native Next.js host, auto-deploys on every push to `main` — this is the "automation" piece for deployment. |
 | PDF generation | **`@react-pdf/renderer`** (server-side) | Deterministic label geometry regardless of the admin's browser/printer, needed for a physical 15-per-A4 cut sheet. |
 | Source control / CI | **GitHub + GitHub Actions** (lint/typecheck) | Free for a small private repo; Vercel's GitHub integration handles deploy automation. |
@@ -303,7 +305,7 @@ layout" for the full tree and build commands.
                     │  - Auth middleware        │
                     │  - Label PDF generation   │
                     └───────────┬───────────────┘
-                                │ Prisma (SQL)
+                                │ Supabase client / SQL RPC
                                 ▼
                     ┌─────────────────────────┐
                     │   Supabase Postgres       │
@@ -493,7 +495,14 @@ Each print run always starts fresh at slot 1 (no cross-day carryover of a
 partially-cut physical sheet) — simpler, and avoids depending on real-world paper
 state the app can't actually see.
 
-### 10.5 Service boundaries (Server Actions, not a separate REST API)
+### 10.5 Service boundaries
+
+The browser does not own authoritative temple rules. React components handle form
+interaction and presentation; Next.js Server Actions/loaders call the `backend/`
+domain services. Those services query Supabase tables for normal reads and invoke
+PostgreSQL RPC functions for transactional multi-table writes. Supabase Edge
+Functions are reserved for scheduled jobs, webhooks, notifications, and external
+integrations—not used as an unnecessary hop for every CRUD operation.
 
 - `DevoteeService.create/update/search/archive` (includes updating the primary address)
 - `BeneficiaryService.create/update/archive/listByDevotee` (scoped to one devotee)
@@ -542,7 +551,7 @@ write — never split "save the record" and "log the audit entry" across two cal
 
 ### 10.8 Visual design direction (first pass — expected to evolve)
 
-Validated as an interactive mockup; approved to build against, not locked in.
+Validated as an interactive frontend; approved to build against, not locked in.
 
 **Palette** — a restrained professional SaaS surface system with temple warmth.
 Saffron remains the brand accent, but large operational surfaces stay neutral and
@@ -578,30 +587,23 @@ and today's day-chip carry a slow ambient glow. No motion is load-bearing.
 
 ## 11. Delivery Plan
 
-**Build order: frontend first, against mock data, then backend.** Rather than
-wiring the database before any screen exists, build the Next.js UI end to end
-against in-memory mock/fixture data first — matching the function names in the
-service boundaries (§10.5) so each is a drop-in replacement later, e.g. a mock
-`EnrollmentService.listByDate()` returning fixture rows today, a Prisma-backed one
-later, same call sites. This validates the temple-theme UI and navigation with real
-screens before any backend investment, and keeps the eventual backend wiring a swap
-rather than a rewrite.
+**Build order: frontend first, then Supabase-backed services.** The UI-first phase
+established the screens and service contracts. Backend integration is now active:
+preserve those frontend call sites while moving reads and writes to Supabase
+through the backend repository/service boundary.
 
 **Phase 0 — discovery:** confirm open decisions in §12 with the temple; collect a
 real diary page (redacted) and the actual A4 label sample/printer details.
 
 **Phase 1 — foundation:**
-- **1a — frontend shell (mock data):** Next.js app in `frontend/`, Tailwind theme
-  from §10.8, routing for every screen in §10.3, built against the mock data
-  already in `backend/src/mock-data.ts` — no auth, no real database yet. **Done**
-  for the Today dashboard; remaining screens still to build.
-- **1b — backend wiring:** repo CI (lint/typecheck), Prisma schema (§10.1) added
-  under `database/`, Postgres (Supabase) + Supabase Auth wired into `backend/`
-  behind the same exported function signatures the mock layer used, plus audit
-  scaffolding.
+- **1a — frontend shell:** Next.js app in `frontend/`, Tailwind theme from §10.8
+  and routes from §10.3. **Done.**
+- **1b — backend wiring:** repo CI (lint/typecheck), versioned Supabase SQL
+  migrations/RLS under `supabase/`, and Supabase Auth/Postgres wired into
+  `backend/` behind the existing service signatures, plus audit scaffolding.
 
-The staged implementation details for the backend boundary, transitional JSON
-repository, frontend Server Actions, and later Prisma adapter are maintained in
+The staged implementation details for the backend boundary, frontend Server
+Actions, and Supabase repository are maintained in
 [`BACKEND_PLAN.md`](BACKEND_PLAN.md).
 
 **Phase 2 — core records:** devotees (with primary address), beneficiaries (per

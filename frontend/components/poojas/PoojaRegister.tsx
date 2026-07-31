@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -18,6 +18,7 @@ import type { Beneficiary, DevoteeDirectoryRow, EnrollmentStatus, PoojaRegisterR
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
+import { savePooja } from "@/app/poojas/actions";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const PAGE_SIZE = 10;
@@ -158,7 +159,7 @@ export function PoojaRegister({
   function saveRow(updated: PoojaRegisterRow) {
     setRows((current) => current.map((row) => row.enrollmentId === updated.enrollmentId ? updated : row));
     setSelected(undefined);
-    setSavedMessage(`Changes to ${updated.beneficiaryName}'s pooja are visible in this frontend session.`);
+    setSavedMessage(`Changes to ${updated.beneficiaryName}'s pooja were saved.`);
   }
 
   return (
@@ -174,7 +175,7 @@ export function PoojaRegister({
 
       {savedMessage && (
         <Alert icon={CircleAlert} tone="info" role="status" className="pooja-save-notice">
-          {savedMessage} Database persistence will be connected in phase 1b.
+          {savedMessage}
         </Alert>
       )}
 
@@ -321,7 +322,7 @@ export function PoojaRegister({
             setDateFilterMode("all");
             setPage(1);
             setAdding(false);
-            setSavedMessage(`${created.beneficiaryName}'s pooja was added in this frontend session.`);
+            setSavedMessage(`${created.beneficiaryName}'s pooja was added.`);
           }}
         />
       )}
@@ -362,6 +363,7 @@ function PoojaEditor({
   const [enrollmentDate, setEnrollmentDate] = useState(row.enrollmentDate);
   const [notes, setNotes] = useState(row.notes ?? "");
   const [error, setError] = useState<string>();
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -379,30 +381,46 @@ function PoojaEditor({
       setError("Beneficiary name and annual pooja date are required.");
       return;
     }
-    onSave({
-      ...row,
-      beneficiaryName: trimmedName,
-      relation,
-      beneficiaryPhone: beneficiaryPhone.trim() || undefined,
-      beneficiaryRashi: beneficiaryRashi.trim() || undefined,
-      beneficiaryNakshatra: beneficiaryNakshatra.trim() || undefined,
-      beneficiaryGotra: beneficiaryGotra.trim() || undefined,
-      beneficiaryNotes: beneficiaryNotes.trim() || undefined,
-      annualMonth: parsedDate.getMonth() + 1,
-      annualDay: parsedDate.getDate(),
-      status,
-      addressMode,
-      addressLine: addressLine.trim(),
-      addressLine2: addressLine2.trim() || undefined,
-      addressCity: addressCity.trim(),
-      addressDistrict: addressDistrict.trim() || undefined,
-      addressState: addressState.trim(),
-      postalCode: postalCode.trim(),
-      feeMinor: Math.round(Number(fee || 0) * 100),
-      paymentReference: paymentReference.trim() || undefined,
-      enrollmentDate,
-      notes: notes.trim() || undefined,
-      hasException: addressMode === "custom" ? !addressLine.trim() || !/^\d{6}$/.test(postalCode) : row.hasException,
+    setError(undefined);
+    startSaving(async () => {
+      const result = await savePooja({
+        id: row.enrollmentId,
+        expectedModifiedAt: row.modifiedAt,
+        devoteeId: row.devoteeId,
+        forSelf: relation === "Self",
+        beneficiary: relation === "Self" ? undefined : {
+          id: row.beneficiaryId ?? undefined,
+          fullName: trimmedName,
+          relation: relation.toLowerCase(),
+          phone: beneficiaryPhone,
+          rashi: beneficiaryRashi,
+          nakshatra: beneficiaryNakshatra,
+          gotra: beneficiaryGotra,
+          notes: beneficiaryNotes,
+        },
+        annualMonth: parsedDate.getMonth() + 1,
+        annualDay: parsedDate.getDate(),
+        status,
+        addressMode,
+        customAddress: addressMode === "custom" ? {
+          line1: addressLine,
+          line2: addressLine2,
+          city: addressCity,
+          district: addressDistrict,
+          state: addressState,
+          postalCode,
+        } : undefined,
+        feeMinor: Math.round(Number(fee || 0) * 100),
+        currency: "INR",
+        paymentReference,
+        enrollmentDate,
+        notes,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      onSave(result.pooja);
     });
   }
 
@@ -420,9 +438,6 @@ function PoojaEditor({
         </header>
 
         <form className="pooja-editor-form" onSubmit={submit}>
-          <Alert icon={Pencil} tone="info" role="status">
-            Frontend preview: saved changes remain only until this page is refreshed.
-          </Alert>
           {error && <Alert>{error}</Alert>}
 
           <FormField id="beneficiary-name" label="Beneficiary name">
@@ -522,7 +537,7 @@ function PoojaEditor({
 
           <div className="pooja-editor-actions">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : "Save Changes"}</Button>
           </div>
         </form>
       </aside>
@@ -588,6 +603,7 @@ function AddPoojaModal({
   const [paymentReference, setPaymentReference] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(todayInputValue);
   const [error, setError] = useState<string>();
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -646,7 +662,6 @@ function AddPoojaModal({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const sponsorName = devoteeMode === "existing" ? selectedDevotee?.fullName ?? "" : devoteeName.trim();
-    const sponsorPhone = devoteeMode === "existing" ? selectedDevotee?.phone ?? null : phone.trim() || null;
     const primaryAddress = devoteeMode === "existing"
       ? {
           line1: selectedDevotee?.addressLine1 ?? "",
@@ -677,43 +692,60 @@ function AddPoojaModal({
     const resolvedBeneficiary = forSelf ? sponsorName : beneficiaryName.trim();
     const resolvedRelation: PoojaRegisterRow["relation"] = forSelf ? "Self" : relation;
 
-    onSave({
-      enrollmentId: `preview-${Date.now()}`,
-      sponsorName,
-      beneficiaryName: resolvedBeneficiary,
-      relation: resolvedRelation,
-      beneficiaryPhone: beneficiaryPhone.trim() || undefined,
-      beneficiaryRashi: beneficiaryRashi.trim() || undefined,
-      beneficiaryNakshatra: beneficiaryNakshatra.trim() || undefined,
-      beneficiaryGotra: beneficiaryGotra.trim() || undefined,
-      beneficiaryNotes: beneficiaryNotes.trim() || undefined,
-      phone: sponsorPhone,
+    startSaving(async () => {
+      const result = await savePooja({
+      devoteeId: devoteeMode === "existing" ? selectedDevotee?.id : undefined,
+      newDevotee: devoteeMode === "new" ? {
+        fullName: devoteeName,
+        dateOfBirth,
+        phone,
+        phoneAlternate,
+        email,
+        rashi,
+        nakshatra,
+        gotra,
+        notes: devoteeNotes,
+        addressLine1: addressLine,
+        addressLine2,
+        city,
+        district,
+        state,
+        postalCode,
+      } : undefined,
+      forSelf,
+      beneficiary: forSelf ? undefined : {
+        id: selectedBeneficiaryId || undefined,
+        fullName: resolvedBeneficiary,
+        relation: resolvedRelation.toLowerCase(),
+        phone: beneficiaryPhone,
+        rashi: beneficiaryRashi,
+        nakshatra: beneficiaryNakshatra,
+        gotra: beneficiaryGotra,
+        notes: beneficiaryNotes,
+      },
       annualMonth: parsedDate.getMonth() + 1,
       annualDay: parsedDate.getDate(),
-      leapDayPolicy: "feb_28",
       addressMode,
-      addressLine: resolvedAddress.line1,
-      addressLine2: resolvedAddress.line2,
-      addressCity: resolvedAddress.city,
-      addressDistrict: resolvedAddress.district,
-      addressState: resolvedAddress.state,
-      postalCode: resolvedAddress.pin,
+      customAddress: addressMode === "custom" ? {
+        line1: resolvedAddress.line1,
+        line2: resolvedAddress.line2,
+        city: resolvedAddress.city,
+        district: resolvedAddress.district,
+        state: resolvedAddress.state,
+        postalCode: resolvedAddress.pin,
+      } : undefined,
       status: "active",
       feeMinor: Math.round(Number(fee || 0) * 100),
       currency: "INR",
-      paymentReference: paymentReference.trim() || undefined,
+      paymentReference,
       enrollmentDate,
-      notes: [
-        beneficiaryNotes.trim(),
-        devoteeMode === "new" && phoneAlternate.trim() ? `Alternate phone: ${phoneAlternate.trim()}` : "",
-        devoteeMode === "new" && dateOfBirth ? `DOB: ${dateOfBirth}` : "",
-        devoteeMode === "new" && email.trim() ? `Email: ${email.trim()}` : "",
-        devoteeMode === "new" && rashi.trim() ? `Rashi: ${rashi.trim()}` : "",
-        devoteeMode === "new" && nakshatra.trim() ? `Nakshatra: ${nakshatra.trim()}` : "",
-        devoteeMode === "new" && gotra.trim() ? `Gotra: ${gotra.trim()}` : "",
-        devoteeMode === "new" && devoteeNotes.trim() ? `Devotee notes: ${devoteeNotes.trim()}` : "",
-      ].filter(Boolean).join(" · ") || undefined,
-      hasException: !sponsorPhone || !resolvedAddress.line1 || !/^\d{6}$/.test(resolvedAddress.pin),
+      notes: beneficiaryNotes,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      onSave(result.pooja);
     });
   }
 
@@ -774,7 +806,7 @@ function AddPoojaModal({
                           selectByDevoteeNumber();
                         }
                       }}
-                      placeholder="For example, DEV-00004 or 4"
+                      placeholder="Enter a Devotee ID"
                     />
                     <Button onClick={selectByDevoteeNumber}>Select</Button>
                   </div>
@@ -1184,7 +1216,9 @@ function AddPoojaModal({
                 setPoojaStep((current) => Math.min(5, current + 1));
               }}>Next <ChevronRight size={16} /></Button>
             ) : poojaStep === 5 ? (
-              <Button type="submit" disabled={!acknowledged}><CheckCircle2 size={17} /> Add Pooja</Button>
+              <Button type="submit" disabled={!acknowledged || isSaving}>
+                <CheckCircle2 size={17} /> {isSaving ? "Adding…" : "Add Pooja"}
+              </Button>
             ) : null}
           </div>
         </form>

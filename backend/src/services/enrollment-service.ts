@@ -1,9 +1,8 @@
-import { TempleData, type DataSnapshot } from "../repositories";
-import type { DueRow, PoojaEnrollment, PoojaRegisterRow } from "../types";
+import type { DataSnapshot, TempleRepository } from "../repositories";
+import type { DueRow, PoojaEnrollment, PoojaRegisterRow, SaveEnrollmentInput } from "../types";
 
-// Mirrors PLAN.md §10.5 `EnrollmentService`. Backed by mock fixtures for now
-// (PLAN.md §11, phase 1a); phase 1b swaps these bodies for Prisma queries while
-// keeping every call site in the UI unchanged.
+// Mirrors PLAN.md §10.5 `EnrollmentService`. Domain resolution stays here while
+// persistence is supplied by the actor-scoped repository.
 
 function isLeapYear(year: number) {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
@@ -84,6 +83,8 @@ function resolveRegisterRow(
 
   return {
     enrollmentId: e.id,
+    devoteeId: e.devoteeId,
+    beneficiaryId: e.beneficiaryId,
     sponsorName: due.sponsorName,
     beneficiaryName: due.beneficiaryName,
     relation: due.relation,
@@ -111,12 +112,15 @@ function resolveRegisterRow(
     notes: e.notes,
     hasException: due.hasException,
     exceptionNote: due.exceptionNote,
+    createdAt: e.createdAt,
+    modifiedAt: e.modifiedAt,
   };
 }
 
-export const EnrollmentService = {
+export function createEnrollmentService(templeData: TempleRepository) {
+  return {
   async listRegister(): Promise<PoojaRegisterRow[]> {
-    const data = await TempleData.loadSnapshot();
+    const data = await templeData.loadSnapshot();
     return data.enrollments
       .map((enrollment) => resolveRegisterRow(enrollment, data))
       .sort((a, b) =>
@@ -126,8 +130,26 @@ export const EnrollmentService = {
       );
   },
 
+  async create(input: SaveEnrollmentInput): Promise<PoojaRegisterRow> {
+    const saved = await templeData.createEnrollment(input);
+    const data = await templeData.loadSnapshot();
+    const enrollment = data.enrollments.find((item) => item.id === saved.id);
+    if (!enrollment) throw new Error("Created enrollment could not be loaded.");
+    return resolveRegisterRow(enrollment, data);
+  },
+
+  async update(
+    input: SaveEnrollmentInput & { id: string; expectedModifiedAt: string },
+  ): Promise<PoojaRegisterRow> {
+    const saved = await templeData.updateEnrollment(input);
+    const data = await templeData.loadSnapshot();
+    const enrollment = data.enrollments.find((item) => item.id === saved.id);
+    if (!enrollment) throw new Error("Updated enrollment could not be loaded.");
+    return resolveRegisterRow(enrollment, data);
+  },
+
   async listByDate(date: Date): Promise<DueRow[]> {
-    const data = await TempleData.loadSnapshot();
+    const data = await templeData.loadSnapshot();
     return activeEnrollments(data)
       .filter((e) => matchesDate(e, date))
       .map((enrollment) => resolve(enrollment, data))
@@ -135,7 +157,7 @@ export const EnrollmentService = {
   },
 
   async countByDate(date: Date): Promise<number> {
-    const data = await TempleData.loadSnapshot();
+    const data = await templeData.loadSnapshot();
     return activeEnrollments(data).filter((e) => matchesDate(e, date)).length;
   },
 
@@ -150,7 +172,7 @@ export const EnrollmentService = {
   },
 
   async countInRange(start: Date, days: number): Promise<number> {
-    const data = await TempleData.loadSnapshot();
+    const data = await templeData.loadSnapshot();
     let total = 0;
     for (let i = 0; i < days; i++) {
       const d = new Date(start);
@@ -162,7 +184,8 @@ export const EnrollmentService = {
 
   /** PLAN.md §10.2 "Month": filter by annual_month alone, no year dependency. */
   async countByMonth(month: number): Promise<number> {
-    const data = await TempleData.loadSnapshot();
+    const data = await templeData.loadSnapshot();
     return activeEnrollments(data).filter((e) => e.annualMonth === month).length;
-  },
-};
+    },
+  };
+}

@@ -57,7 +57,7 @@
   --transition-normal: 200ms ease;
   --transition-slow: 300ms ease;
 
-  /* Compatibility aliases for the first frontend mockup. */
+  /* Compatibility aliases for legacy frontend styles. */
   --bg: var(--color-background);
   --bg-raised: var(--color-surface);
   --bg-sunken: var(--color-surface-muted);

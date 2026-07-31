@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Pencil, Phone, Plus, Search, TriangleAlert, Users, X } from "lucide-react";
 import type { DevoteeDirectoryRow } from "@kambaru/backend";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
+import { saveDevotee } from "@/app/devotees/actions";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const PAGE_SIZE = 10;
@@ -70,7 +71,7 @@ export function DevoteeDirectory({
   function saveRow(updated: DevoteeDirectoryRow) {
     setRows((current) => current.map((row) => row.id === updated.id ? updated : row));
     setSelected(undefined);
-    setSavedMessage(`${updated.fullName}'s profile was updated in this frontend session.`);
+    setSavedMessage(`${updated.fullName}'s profile was updated.`);
   }
 
   return (
@@ -202,7 +203,7 @@ export function DevoteeDirectory({
 
       {savedMessage && (
         <Alert icon={CheckCircle2} tone="info" role="status" className="devotee-save-notice">
-          {savedMessage} Database persistence will be connected in phase 1b.
+          {savedMessage}
         </Alert>
       )}
 
@@ -219,8 +220,8 @@ export function DevoteeDirectory({
       {adding && (
         <DevoteeEditor
           row={{
-            id: "preview-new-devotee",
-            devoteeNo: `DEV-${String(rows.length + 1).padStart(5, "0")}`,
+            id: "",
+            devoteeNo: "",
             fullName: "",
             phone: null,
             addressLine1: "",
@@ -229,12 +230,15 @@ export function DevoteeDirectory({
             postalCode: "PIN missing",
             poojaCount: 0,
             hasException: true,
+            createdAt: "",
+            modifiedAt: "",
           }}
+          isNew
           onClose={() => setAdding(false)}
           onSave={(created) => {
             setRows((current) => [...current, created].sort((a, b) => a.fullName.localeCompare(b.fullName)));
             setAdding(false);
-            setSavedMessage(`${created.fullName}'s profile was added in this frontend session.`);
+            setSavedMessage(`${created.fullName}'s profile was added.`);
           }}
         />
       )}
@@ -244,14 +248,15 @@ export function DevoteeDirectory({
 
 function DevoteeEditor({
   row,
+  isNew = false,
   onClose,
   onSave,
 }: {
   row: DevoteeDirectoryRow;
+  isNew?: boolean;
   onClose: () => void;
   onSave: (row: DevoteeDirectoryRow) => void;
 }) {
-  const isNew = row.id === "preview-new-devotee";
   const [name, setName] = useState(row.fullName);
   const [dateOfBirth, setDateOfBirth] = useState(row.dateOfBirth ?? "");
   const [phone, setPhone] = useState(row.phone ?? "");
@@ -270,6 +275,7 @@ function DevoteeEditor({
   const [error, setError] = useState<string>();
   const [step, setStep] = useState(1);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -290,30 +296,32 @@ function DevoteeEditor({
       return;
     }
 
-    const hasException =
-      !phone.trim() ||
-      !addressLine1.trim() ||
-      !city.trim() ||
-      !state.trim() ||
-      !/^\d{6}$/.test(postalCode);
-    onSave({
-      ...row,
-      fullName: name.trim(),
-      dateOfBirth: dateOfBirth || undefined,
-      phone: phone.trim() || null,
-      phoneAlternate: phoneAlternate.trim() || undefined,
-      email: email.trim() || undefined,
-      rashi: rashi.trim() || undefined,
-      nakshatra: nakshatra.trim() || undefined,
-      gotra: gotra.trim() || undefined,
-      notes: notes.trim() || undefined,
-      addressLine1: addressLine1.trim(),
-      addressLine2: addressLine2.trim() || undefined,
-      city: city.trim() || "City missing",
-      district: district.trim() || undefined,
-      state: state.trim(),
-      postalCode: postalCode.trim() || "PIN missing",
-      hasException,
+    setError(undefined);
+    startSaving(async () => {
+      const result = await saveDevotee({
+        id: isNew ? undefined : row.id,
+        expectedModifiedAt: isNew ? undefined : row.modifiedAt,
+        fullName: name,
+        dateOfBirth,
+        phone,
+        phoneAlternate,
+        email,
+        rashi,
+        nakshatra,
+        gotra,
+        notes,
+        addressLine1,
+        addressLine2,
+        city,
+        district,
+        state,
+        postalCode,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      onSave(result.devotee);
     });
   }
 
@@ -340,11 +348,6 @@ function DevoteeEditor({
         </header>
 
         <form className={`pooja-editor-form ${step === 5 ? "devotee-review-form" : ""}`} onSubmit={submit}>
-          {step < 5 && (
-            <Alert icon={Pencil} tone="info" role="status">
-              Frontend preview: saved changes remain only until this page is refreshed.
-            </Alert>
-          )}
           {error && <Alert>{error}</Alert>}
           <div className="devotee-stepper" aria-label={`Step ${step} of 5`}>
             {["Personal", "Spiritual", "Address", "Notes", "Review"].map((label, index) => (
@@ -496,8 +499,8 @@ function DevoteeEditor({
             {step < 5 ? (
               <Button onClick={nextStep}>Next <ChevronRight size={16} /></Button>
             ) : (
-              <Button type="submit" disabled={!acknowledged}>
-                <CheckCircle2 size={17} /> {isNew ? "Add Devotee" : "Save Profile"}
+              <Button type="submit" disabled={!acknowledged || isSaving}>
+                <CheckCircle2 size={17} /> {isSaving ? "Saving…" : isNew ? "Add Devotee" : "Save Profile"}
               </Button>
             )}
           </div>

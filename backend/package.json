@@ -2,7 +2,7 @@
   "name": "@kambaru/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Domain services and types for Kambaru Devi Seva — mock data today, Prisma-backed once phase 1b (PLAN.md §11) wires up Postgres.",
+  "description": "Trusted domain services and Supabase repository boundary for Kambaru Devi Seva.",
   "main": "./src/index.ts",
   "types": "./src/index.ts"
 }

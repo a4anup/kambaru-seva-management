@@ -1,6 +1,5 @@
-// Shapes mirror PLAN.md §10.1 (Devotee / Beneficiary / PoojaEnrollment), flattened
-// for display. Once the backend is wired up (PLAN.md §11, phase 1b), these types
-// move to reflect the Prisma-generated types instead.
+// Shapes mirror PLAN.md §10.1 (Devotee / Beneficiary / PoojaEnrollment), with
+// explicit display models returned by the domain services.
 
 export type BeneficiaryRelation =
   | "son"
@@ -100,6 +99,8 @@ export interface DaySummary {
 /** Display/edit shape for the date-filtered Shashwatha Pooja register. */
 export interface PoojaRegisterRow {
   enrollmentId: string;
+  devoteeId: string;
+  beneficiaryId: string | null;
   sponsorName: string;
   beneficiaryName: string;
   relation: "Self" | Capitalize<BeneficiaryRelation>;
@@ -127,6 +128,8 @@ export interface PoojaRegisterRow {
   notes?: string;
   hasException: boolean;
   exceptionNote?: string;
+  createdAt: string;
+  modifiedAt: string;
 }
 
 /** Summary row for the alphabet-filtered devotee directory. */
@@ -150,4 +153,63 @@ export interface DevoteeDirectoryRow {
   postalCode: string;
   poojaCount: number;
   hasException: boolean;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface SaveDevoteeInput {
+  id?: string;
+  expectedModifiedAt?: string;
+  fullName: string;
+  dateOfBirth?: string;
+  phone?: string;
+  phoneAlternate?: string;
+  email?: string;
+  rashi?: string;
+  nakshatra?: string;
+  gotra?: string;
+  notes?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  postalCode?: string;
+}
+
+export interface SaveBeneficiaryInput {
+  id?: string;
+  fullName: string;
+  relation: BeneficiaryRelation;
+  phone?: string;
+  rashi?: string;
+  nakshatra?: string;
+  gotra?: string;
+  notes?: string;
+}
+
+export interface SaveEnrollmentInput {
+  id?: string;
+  expectedModifiedAt?: string;
+  devoteeId?: string;
+  newDevotee?: SaveDevoteeInput;
+  forSelf: boolean;
+  beneficiary?: SaveBeneficiaryInput;
+  annualMonth: number;
+  annualDay: number;
+  addressMode: "devotee_primary" | "custom";
+  customAddress?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    postalCode?: string;
+  };
+  status?: EnrollmentStatus;
+  feeMinor?: number;
+  currency?: "INR";
+  paymentReference?: string;
+  enrollmentDate?: string;
+  notes?: string;
 }

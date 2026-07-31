@@ -1,4 +1,6 @@
-import { Bell, CalendarDays, Menu } from "lucide-react";
+import { CalendarDays, LogOut, Menu } from "lucide-react";
+import { signOut } from "@/app/login/actions";
+import { useStaffSession } from "@/components/auth/StaffSessionProvider";
 
 export function Header({
   title,
@@ -11,6 +13,7 @@ export function Header({
   onMenuToggle: () => void;
   className?: string;
 }) {
+  const staff = useStaffSession();
   const formattedDate = new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
     month: "short",
@@ -37,14 +40,21 @@ export function Header({
       </div>
       <div className="topbar-actions">
         <span className="date-label"><CalendarDays size={18} /> {formattedDate}</span>
-        <button className="icon-button notification" aria-label="Notifications" type="button">
-          <Bell size={20} />
-          <span>2</span>
-        </button>
-        <div className="profile">
-          <div className="avatar">AS</div>
-          <div><strong>Anil Shetty</strong><small>Admin</small></div>
-        </div>
+        {staff && (
+          <>
+            <div className="profile">
+              <div className="avatar">
+                {staff.displayName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+              </div>
+              <div><strong>{staff.displayName}</strong><small>{staff.role}</small></div>
+            </div>
+            <form action={signOut}>
+              <button className="icon-button" aria-label="Sign out" title="Sign out" type="submit">
+                <LogOut size={19} />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </header>
   );

@@ -6,7 +6,7 @@ Build and maintain **Kambaru Devi Seva**, the administration application for Kam
 
 ## Source of truth
 
-Read `PLAN.md` (repo root) before implementation — it is the single combined
+Read `docs/PLAN.md` before implementation — it is the single combined
 requirements, architecture, and high-level design document for this project:
 product rules and acceptance criteria, system boundaries and data model, screens,
 services, and delivery phasing all live there.
@@ -40,17 +40,21 @@ principle above a real package boundary instead of a folder convention.
 ```
 Kambaru/
   package.json        # workspace root — "workspaces": ["frontend", "backend"]
-  PLAN.md  AGENTS.md
+  AGENTS.md
+  docs/
+    PLAN.md            # product/architecture source of truth
+    BACKEND_PLAN.md    # executable backend delivery plan
   frontend/           # @kambaru/frontend — Next.js app: routes, components,
                        # Server Actions. Imports @kambaru/backend as a dependency.
   backend/            # @kambaru/backend — domain services + types, no UI code.
-                       # Mock data today (backend/src/mock-data.ts); Prisma-backed
-                       # once phase 1b starts. Exports everything through
+                       # Calls Supabase Postgres/RPC through repository interfaces.
+                       # Exports everything through
                        # backend/src/index.ts — import from "@kambaru/backend",
                        # never reach into individual files across the package
                        # boundary.
-  database/           # Prisma schema/migrations/seeds — added in phase 1b, empty
-                       # until then (see database/README.md).
+  supabase/           # Supabase config, SQL migrations, RLS policies, and the
+                       # small number of Edge Functions justified by external or
+                       # scheduled workflows.
   infra/              # deployment notes, backup scripts, env templates (see
                        # infra/README.md). GitHub Actions workflows themselves
                        # must live at .github/workflows/ (a GitHub requirement).
@@ -63,22 +67,18 @@ npm's workspace flag forwarding for extra args is unreliable from the root.
 
 ## Build order
 
-Frontend first, against mock data, then backend — see `PLAN.md` §11. Concretely:
+The frontend shell is complete; backend integration is now active:
 
-1. Build the Next.js UI (all screens in `PLAN.md` §10.3) in `frontend/`, against
-   the mock data already in `backend/src/mock-data.ts`. No auth, no real database
-   in this step.
-2. Name mock data-access functions after the service boundaries in `PLAN.md`
-   §10.5 (e.g. `EnrollmentService.listByDate()`, already implemented in
-   `backend/src/services/`) so swapping the implementation from a mock fixture to
-   a real Prisma/Supabase call later is a drop-in replacement at the call site,
-   not a rewrite.
-3. Only after the UI is validated: add the Prisma schema under `database/`
-   (`PLAN.md` §10.1), wire up Postgres (Supabase) and Supabase Auth inside
-   `backend/`, behind those same exported function signatures.
+1. Keep React interaction and presentation logic in `frontend/`.
+2. Keep trusted temple/domain rules in `backend/`, independent of React and the
+   Supabase SDK.
+3. Backend services call Supabase tables for ordinary reads and PostgreSQL RPC
+   functions for transactional multi-table mutations.
+4. Use Supabase Edge Functions only for scheduled jobs, webhooks, notifications,
+   or integrations that genuinely require their own server runtime.
+5. Supabase tables are the only runtime application data source.
 
-Do not build backend plumbing (schema, auth, API routes) ahead of a screen that
-actually needs it — this project is intentionally sequenced UI-first.
+Do not move authorization or authoritative domain validation into browser code.
 
 ## Visual design direction
 
@@ -171,7 +171,7 @@ Unless the project records a superseding architecture decision:
 
 - TypeScript with strict mode
 - Next.js using the App Router
-- PostgreSQL and Supabase migrations
+- PostgreSQL and version-controlled Supabase SQL migrations
 - Supabase Auth with Row Level Security
 - A schema-aware validation library at all input boundaries
 - Server-side PDF rendering with deterministic dimensions
@@ -184,7 +184,7 @@ Pin major dependencies and review generated lockfile changes.
 - Enforce authorization on the server and in database policies; hiding UI controls is insufficient.
 - Never expose service-role credentials to browser code.
 - Never commit secrets, production exports, diary photos, addresses, phone numbers, or other real devotee data.
-- Use synthetic fixtures in tests and screenshots.
+- Never use real devotee data in tests or screenshots.
 - Redact personal data from logs, telemetry, errors, and analytics.
 - Validate and authorize every CSV/PDF export.
 - Audit creates, edits, archives, imports, and status changes in the same transaction where practical.
@@ -208,7 +208,7 @@ Pin major dependencies and review generated lockfile changes.
 1. Identify the relevant requirement and acceptance criterion.
 2. Update or add an architecture decision when changing a core technology or data rule.
 3. Implement the smallest complete vertical slice.
-4. Add or update migrations, policies, tests, and fixtures together.
+4. Add or update migrations, policies, and tests together.
 5. Run formatting, lint, type-check, unit/integration tests, and relevant end-to-end tests.
 6. Verify migration behavior against a clean database and an upgraded database.
 7. Update documentation when behavior or operations change.
@@ -260,7 +260,7 @@ Mandatory edge cases include:
 - Idempotency considered
 - Timezone/date behavior tested
 - Audit behavior tested
-- PII-free logs and fixtures
+- PII-free logs and tests
 - Automated checks pass
 - Documentation/runbook updated
 - Physical print test completed when label geometry changes

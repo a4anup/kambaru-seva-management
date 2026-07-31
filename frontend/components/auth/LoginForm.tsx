@@ -8,21 +8,13 @@ import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/auth/PasswordInput";
+import { signIn } from "@/app/login/actions";
 import styles from "@/app/login/login.module.css";
 
 type FieldErrors = {
   identity?: string;
   password?: string;
 };
-
-type SignInResult = { ok: true } | { ok: false };
-
-async function mockSignIn(identity: string, password: string): Promise<SignInResult> {
-  // Phase 1b integration point: replace with a backend AuthService/Supabase call.
-  // Credentials are intentionally neither logged nor persisted.
-  await new Promise((resolve) => window.setTimeout(resolve, 550));
-  return identity.length > 0 && password.length > 0 ? { ok: true } : { ok: false };
-}
 
 export function LoginForm({ className = "" }: { className?: string }) {
   const router = useRouter();
@@ -51,15 +43,15 @@ export function LoginForm({ className = "" }: { className?: string }) {
 
     setSubmitting(true);
     try {
-      const result = await mockSignIn(identity.trim(), password);
+      const result = await signIn(identity.trim(), password);
       if (!result.ok) {
-        setAuthError("Unable to sign in. Check your username and password.");
+        setAuthError(result.message);
+        setSubmitting(false);
         return;
       }
-      router.replace("/dashboard");
+      router.push("/dashboard");
     } catch {
       setAuthError("Unable to sign in. Check your username and password.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -76,10 +68,6 @@ export function LoginForm({ className = "" }: { className?: string }) {
         <p className={styles.applicationSubtitle}>Management Application</p>
         <p className={styles.welcome}>Welcome back! Please sign in to continue.</p>
       </header>
-
-      <Alert icon={ShieldCheck} tone="info" role="status" className={styles.previewNotice}>
-        Frontend preview: authentication is not connected yet. Validated submissions open the mock dashboard.
-      </Alert>
 
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         {authError && <Alert>{authError}</Alert>}

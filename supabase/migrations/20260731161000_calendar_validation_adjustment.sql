@@ -1,0 +1,4 @@
+-- Intentionally empty in source control.
+-- This version adjusted only the linked development project's earlier synthetic
+-- fixtures so reserved calendar test dates remain empty. Production projects must
+-- never receive validation-data adjustments through the migration chain.

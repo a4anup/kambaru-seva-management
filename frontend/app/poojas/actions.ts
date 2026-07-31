@@ -1,6 +1,6 @@
 "use server";
 
-import type { PoojaRegisterRow } from "@kambaru/backend";
+import type { PageResult, PoojaRegisterFilterMode, PoojaRegisterRow } from "@kambaru/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getBackendServices } from "@/lib/server/backend";
@@ -36,7 +36,7 @@ const newDevotee = z.object({
 });
 const enrollment = z.object({
   id: z.string().uuid().optional(),
-  expectedModifiedAt: z.string().datetime().optional(),
+  expectedModifiedAt: z.string().datetime({ offset: true }).optional(),
   devoteeId: z.string().uuid().optional(),
   newDevotee: newDevotee.optional(),
   forSelf: z.boolean(),
@@ -77,6 +77,31 @@ const enrollment = z.object({
 export type SavePoojaResult =
   | { ok: true; pooja: PoojaRegisterRow }
   | { ok: false; message: string };
+
+export async function loadPoojaRegister(input: {
+  mode: PoojaRegisterFilterMode;
+  date: string;
+  search?: string;
+  page?: number;
+}): Promise<PageResult<PoojaRegisterRow>> {
+  const { enrollments } = await getBackendServices();
+  return enrollments.listRegisterPage({ ...input, pageSize: 10 });
+}
+
+export async function loadPoojaCalendar(year: number, month: number) {
+  const { enrollments } = await getBackendServices();
+  return enrollments.getCalendarCounts(year, month);
+}
+
+export async function searchDevotees(search: string) {
+  const { devotees } = await getBackendServices();
+  return (await devotees.listDirectoryPage({ search, page: 1, pageSize: 10 })).items;
+}
+
+export async function loadBeneficiaries(devoteeId: string) {
+  const { beneficiaries } = await getBackendServices();
+  return beneficiaries.listByDevotee(devoteeId);
+}
 
 export async function savePooja(input: unknown): Promise<SavePoojaResult> {
   const parsed = enrollment.safeParse(input);

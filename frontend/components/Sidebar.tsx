@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import logo from "@/assets/logo.png";
+import { signOut } from "@/app/login/actions";
 import {
   BarChart3,
   Home,
@@ -17,8 +20,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/devotees", label: "Devotees", icon: Users },
   { href: "/poojas", label: "Poojas", icon: Sparkles },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/labels", label: "Generate Labels", icon: Printer },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/audit", label: "Audit Log", icon: ShieldCheck },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -44,7 +47,14 @@ export function Sidebar({
     />
     <aside id="application-sidebar" className={`sidebar ${open ? "open" : ""} ${className}`.trim()}>
       <div className="brand">
-        <div className="brand-icon" aria-hidden="true">ॐ</div>
+        <Image
+          className="brand-logo"
+          src={logo}
+          alt="Kambaramma"
+          width={96}
+          height={96}
+          priority
+        />
       </div>
 
       <nav className="nav-list" aria-label="Main navigation">
@@ -59,10 +69,12 @@ export function Sidebar({
         })}
       </nav>
 
-      <Link className="sidebar-logout" href="/login" onClick={onClose}>
-        <LogOut size={20} strokeWidth={1.8} aria-hidden="true" />
-        <span>Logout</span>
-      </Link>
+      <form className="sidebar-logout-form" action={signOut} onSubmit={onClose}>
+        <button className="sidebar-logout" type="submit">
+          <LogOut size={20} strokeWidth={1.8} aria-hidden="true" />
+          <span>Logout</span>
+        </button>
+      </form>
     </aside>
     </>
   );

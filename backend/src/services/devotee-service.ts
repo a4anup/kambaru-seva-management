@@ -36,17 +36,14 @@ function directoryRow(devotee: Devotee, poojaCount: number): DevoteeDirectoryRow
 // from the Supabase transport used by the repository.
 export function createDevoteeService(templeData: TempleRepository) {
   return {
-  async listDirectory(): Promise<DevoteeDirectoryRow[]> {
-    const { devotees, enrollments } = await templeData.loadSnapshot();
-    return devotees
-      .map((devotee) => {
-        const poojaCount = enrollments.filter(
-          (enrollment) => enrollment.devoteeId === devotee.id && enrollment.status === "active",
-        ).length;
-        return directoryRow(devotee, poojaCount);
-      })
-      .sort((a, b) => a.fullName.localeCompare(b.fullName));
-    },
+  async listDirectoryPage(input: { search?: string; letter?: string; page?: number; pageSize?: number } = {}) {
+    return templeData.listDevoteesPage({
+      search: input.search,
+      letter: input.letter,
+      page: input.page ?? 1,
+      pageSize: input.pageSize ?? 10,
+    });
+  },
     async create(input: SaveDevoteeInput): Promise<DevoteeDirectoryRow> {
       return directoryRow(await templeData.createDevotee(input), 0);
     },
@@ -54,13 +51,8 @@ export function createDevoteeService(templeData: TempleRepository) {
       input: SaveDevoteeInput & { id: string; expectedModifiedAt: string },
     ): Promise<DevoteeDirectoryRow> {
       const saved = await templeData.updateDevotee(input);
-      const { enrollments } = await templeData.loadSnapshot();
-      return directoryRow(
-        saved,
-        enrollments.filter(
-          (enrollment) => enrollment.devoteeId === saved.id && enrollment.status === "active",
-        ).length,
-      );
+      const page = await templeData.listDevoteesPage({ search: saved.devoteeNo, page: 1, pageSize: 1 });
+      return page.items[0] ?? directoryRow(saved, 0);
     },
   };
 }

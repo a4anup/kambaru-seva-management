@@ -6,6 +6,8 @@ export * from "./types";
 export { createEnrollmentService } from "./services/enrollment-service";
 export { createDevoteeService } from "./services/devotee-service";
 export { createBeneficiaryService } from "./services/beneficiary-service";
+export { createLabelService } from "./services/label-service";
+export { createReportService } from "./services/report-service";
 export {
   createSupabaseTempleRepository,
   type SupabaseRepositoryConfig,
@@ -15,6 +17,8 @@ export {
 import { createBeneficiaryService } from "./services/beneficiary-service";
 import { createDevoteeService } from "./services/devotee-service";
 import { createEnrollmentService } from "./services/enrollment-service";
+import { createLabelService } from "./services/label-service";
+import { createReportService } from "./services/report-service";
 import type { TempleRepository } from "./repositories";
 
 export function createTempleServices(repository: TempleRepository) {
@@ -22,5 +26,7 @@ export function createTempleServices(repository: TempleRepository) {
     devotees: createDevoteeService(repository),
     beneficiaries: createBeneficiaryService(repository),
     enrollments: createEnrollmentService(repository),
+    labels: createLabelService(repository),
+    reports: createReportService(repository),
   };
 }

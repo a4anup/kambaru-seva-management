@@ -1,6 +1,6 @@
 # Kambaru Seva Management
 
-Administrative platform for **Kambaru Sri Durgaparameshwari Temple** to manage
+Administrative platform for **Shree Durgaparameshwari Temple Kambar** to manage
 devotees, annual **Shashwatha Pooja** enrollments, prasada dispatch, courier
 address labels, reports, and daily temple operations.
 
@@ -34,9 +34,13 @@ external integrations.
 
 ```sh
 npm install
-cp .env.example .env
+cp .env.example frontend/.env
 npm run dev
 ```
+
+Note: the env file must live in `frontend/`, not the repo root — Next.js loads
+`.env` relative to where `next dev`/`next build` actually runs (the frontend
+workspace), not the monorepo root.
 
 Supabase is the only runtime data source; there is intentionally no JSON or
 in-memory fallback. Setup is documented in

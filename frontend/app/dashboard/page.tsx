@@ -14,6 +14,7 @@ import { MetricCard, type MetricTone } from "@/components/MetricCard";
 import { QuickActions } from "@/components/QuickActions";
 import { TodayPoojaTable } from "@/components/TodayPoojaTable";
 import { UpcomingPoojas, type UpcomingPooja } from "@/components/UpcomingPoojas";
+import { PageFooter } from "@/components/PageFooter";
 import { getBackendServices } from "@/lib/server/backend";
 
 function dateLabel(date: Date, options?: Intl.DateTimeFormatOptions) {
@@ -37,26 +38,40 @@ function dateInputValue(date: Date) {
 export default async function DashboardPage() {
   const services = await getBackendServices();
   const today = new Date();
-  const monday = services.enrollments.mondayOfWeek(today);
-  const [todayRows, weekCount, directory, register] = await Promise.all([
-    services.enrollments.listByDate(today),
-    services.enrollments.countInRange(monday, 7),
-    services.devotees.listDirectory(),
-    services.enrollments.listRegister(),
+  const todayValue = dateInputValue(today);
+  const [summary, todayPage] = await Promise.all([
+    services.enrollments.getDashboardSummary(todayValue),
+    services.enrollments.listRegisterPage({ mode: "today", date: todayValue, page: 1, pageSize: 10 }),
   ]);
 
-  const upcoming: UpcomingPooja[] = await Promise.all(Array.from({ length: 5 }, async (_, index) => {
+  const todayRows = todayPage.items.map((row) => ({
+    enrollmentId: row.enrollmentId,
+    beneficiaryName: row.beneficiaryName,
+    relation: row.relation,
+    sponsorName: row.sponsorName,
+    phone: row.phone,
+    addressLine: row.addressLine || "No address on file",
+    addressSub: [row.addressCity, row.postalCode].filter(Boolean).join(" "),
+    isCustomAddress: row.addressMode === "custom",
+    hasException: row.hasException,
+    exceptionNote: row.exceptionNote,
+    notes: row.notes,
+  }));
+
+  const countByDate = new Map(summary.dailyCounts.map((item) => [item.date, item.count]));
+  const upcoming: UpcomingPooja[] = Array.from({ length: 5 }, (_, index) => {
     const date = new Date(today);
     date.setDate(date.getDate() + index + 1);
+    const value = dateInputValue(date);
     return {
       day: dateLabel(date, { day: "2-digit" }),
       month: dateLabel(date, { month: "short" }).toUpperCase(),
       weekday: dateLabel(date, { weekday: "short" }),
-      count: await services.enrollments.countByDate(date),
+      count: countByDate.get(value) ?? 0,
       label: dateLabel(date, { weekday: "long", day: "2-digit", month: "short", year: "numeric" }),
       date: dateInputValue(date),
     };
-  }));
+  });
 
   const metrics: Array<{
     label: string;
@@ -65,11 +80,11 @@ export default async function DashboardPage() {
     icon: typeof CalendarDays;
     tone: MetricTone;
   }> = [
-    { label: "Today's Poojas", value: todayRows.length, helper: "Poojas scheduled for today", icon: CalendarDays, tone: "orange" },
-    { label: "This Week Poojas", value: weekCount, helper: "Poojas this week", icon: ClipboardList, tone: "amber" },
-    { label: "Active Poojas", value: register.filter((pooja) => pooja.status === "active").length, helper: "All active pooja enrollments", icon: Sparkles, tone: "red" },
-    { label: "Total Devotees", value: directory.length, helper: "Registered devotees", icon: Users, tone: "green" },
-    { label: "Labels Ready", value: todayRows.length, helper: "Available for today's poojas", icon: Printer, tone: "purple" },
+    { label: "Today's Poojas", value: summary.todayCount, helper: "Poojas scheduled for today", icon: CalendarDays, tone: "orange" },
+    { label: "This Week Poojas", value: summary.weekCount, helper: "Poojas this week", icon: ClipboardList, tone: "amber" },
+    { label: "Active Poojas", value: summary.activeCount, helper: "All active pooja enrollments", icon: Sparkles, tone: "red" },
+    { label: "Total Devotees", value: summary.devoteeCount, helper: "Registered devotees", icon: Users, tone: "green" },
+    { label: "Labels Ready", value: summary.todayCount, helper: "Available for today's poojas", icon: Printer, tone: "purple" },
   ];
 
   const actions = [
@@ -86,6 +101,9 @@ export default async function DashboardPage() {
   return (
     <AppShell title="Dashboard">
       <section className="dashboard-body">
+        <div className="devotional-ambience" aria-hidden="true">
+          {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+        </div>
         <div className="metric-grid">
           {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
         </div>
@@ -99,7 +117,7 @@ export default async function DashboardPage() {
             <UpcomingPoojas items={upcoming} />
           </aside>
         </div>
-        <footer className="page-footer"><span /> Kambaru Sri Durgaparameshwari Temple <span /></footer>
+        <PageFooter />
       </section>
     </AppShell>
   );

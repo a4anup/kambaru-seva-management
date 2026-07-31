@@ -9,17 +9,21 @@ export default async function PoojasPage({
 }) {
   const { date } = await searchParams;
   const services = await getBackendServices();
-  const [initialRows, devotees, beneficiaries] = await Promise.all([
-    services.enrollments.listRegister(),
-    services.devotees.listDirectory(),
-    services.beneficiaries.listAll(),
+  const initialDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const initialMode = date ? "custom" as const : "today" as const;
+  const parsedDate = new Date(`${initialDate}T00:00:00`);
+  const [initialPage, initialCalendarCounts, devoteePage] = await Promise.all([
+    services.enrollments.listRegisterPage({ mode: initialMode, date: initialDate, page: 1, pageSize: 10 }),
+    services.enrollments.getCalendarCounts(parsedDate.getFullYear(), parsedDate.getMonth() + 1),
+    services.devotees.listDirectoryPage({ page: 1, pageSize: 10 }),
   ]);
   return (
     <AppShell title="Poojas">
       <PoojaRegister
-        initialRows={initialRows}
-        devotees={devotees}
-        beneficiaries={beneficiaries}
+        initialPage={initialPage}
+        initialCalendarCounts={initialCalendarCounts}
+        devotees={devoteePage.items}
+        beneficiaries={[]}
         initialDate={date}
       />
     </AppShell>

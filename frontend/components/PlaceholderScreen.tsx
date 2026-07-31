@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { PageFooter } from "@/components/PageFooter";
 
 export function PlaceholderScreen({
   title,
@@ -14,6 +15,7 @@ export function PlaceholderScreen({
           <h2>Coming soon</h2>
           <p>{body}</p>
         </div>
+        <PageFooter />
       </section>
     </AppShell>
   );

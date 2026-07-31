@@ -1,4 +1,4 @@
-export type { DataSnapshot, TempleRepository } from "./contracts";
+export type { TempleRepository } from "./contracts";
 export {
   createSupabaseTempleRepository,
   type SupabaseRepositoryConfig,

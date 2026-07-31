@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build and maintain **Kambaru Devi Seva**, the administration application for Kambaru Sri Durgaparameshwari Temple. Its initial annual seva workflow is **Shashwatha Pooja**. Optimize for correctness of annual scheduling, protection of devotee data, simple daily temple operations, and future expansion without premature complexity.
+Build and maintain **Kambaru Devi Seva**, the administration application for Shree Durgaparameshwari Temple Kambar. Its initial annual seva workflow is **Shashwatha Pooja**. Optimize for correctness of annual scheduling, protection of devotee data, simple daily temple operations, and future expansion without premature complexity.
 
 ## Source of truth
 
@@ -202,6 +202,9 @@ Pin major dependencies and review generated lockfile changes.
 - Normalize phones for lookup while preserving the entered display form.
 - Use optimistic concurrency for editable master records.
 - Add a unique constraint on `(enrollment_id, service_date)`.
+- Interactive production pages must use bounded database-side pagination and
+  filtering. `loadSnapshot()` is a compatibility/bulk-processing path only and
+  must not be introduced into dashboard, directory, register, or typeahead reads.
 
 ## Change workflow
 

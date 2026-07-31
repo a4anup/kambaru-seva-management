@@ -14,7 +14,7 @@ Last updated: 2026-07-30
 
 ## 1. Background & Problem Statement
 
-Kambaru Sri Durgaparameshwari Temple runs a seva called **Shashwatha Pooja**: a
+Shree Durgaparameshwari Temple Kambar runs a seva called **Shashwatha Pooja**: a
 devotee pays ₹1000, and every year, on a fixed calendar date (typically a birthday),
 the temple performs a pooja on their behalf and couriers prasada to an address.
 
@@ -29,6 +29,18 @@ everywhere they appear.
 Staff enter devotee and pooja information **once**. The application then reliably
 surfaces, every day, exactly who is due — with correct contact/address details — and
 produces print-ready courier labels, with no re-entry required in future years.
+
+### Production reference numbers
+
+- UUIDs remain the internal database identifiers.
+- New devotees receive a stable staff-facing number in the form
+  `KDP-DEV-000001` (six-digit sequence).
+- New Shashwatha Poojas receive a date-scoped number in the form
+  `KDP-SP-DDMM-0001` (four-digit sequence for that annual day/month), for example
+  `KDP-SP-0102-0001` for the first pooja registered for 1 February.
+- If an enrollment's annual date is corrected, its staff-facing pooja number is
+  regenerated for the corrected date; audit history and relationships continue to
+  use the immutable UUID.
 
 ### Success measures
 
@@ -220,7 +232,7 @@ before/after values. Append-only.
 |---|---|
 | Cost | Hosting should run at **$0/month** on free tiers given the current scale (2–3 active users). Revisit the tradeoffs in §9.4 if reliability needs grow. |
 | Reliability | Automated backups matter — the diary being replaced is itself the backup today, so once staff stop keeping it in parallel, data loss risk shifts entirely onto this app. |
-| Performance | Trivial at this scale (a few hundred devotees at most) — no meaningful performance engineering needed for MVP. |
+| Performance | Operational lists use database-side filtering, stable ordering, aggregation, and bounded pagination. Dashboard and calendar counts use aggregate read models. Whole-table snapshots are prohibited on interactive production paths; bulk reports and labels must use authorized server-side batches. Load-test the release dataset at 10,000+ devotees/enrollments before launch. |
 | Security & privacy | HTTPS only; every route except login requires an authenticated session; personal data (phone, address) never appears in logs/analytics; secrets stay server-side. |
 | Accessibility | Responsive on desktop/tablet/mobile browser; clear validation messages; unambiguous date display (e.g. `23 Mar`). |
 | Maintainability | Version-controlled DB migrations; business rules (recurrence, address rules) testable independent of the UI. |

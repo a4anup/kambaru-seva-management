@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   CalendarDays,
   CheckCircle2,
@@ -9,23 +10,28 @@ import {
   CircleAlert,
   Pencil,
   Plus,
+  Printer,
   Search,
   Sparkles,
   TriangleAlert,
   X,
 } from "lucide-react";
-import type { Beneficiary, DevoteeDirectoryRow, EnrollmentStatus, PoojaRegisterRow } from "@kambaru/backend";
+import type { Beneficiary, DevoteeDirectoryRow, EnrollmentStatus, PageResult, PoojaRegisterRow } from "@kambaru/backend";
+import { PageFooter } from "@/components/PageFooter";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
-import { savePooja } from "@/app/poojas/actions";
+import { loadBeneficiaries, loadPoojaCalendar, loadPoojaRegister, savePooja, searchDevotees } from "@/app/poojas/actions";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const PAGE_SIZE = 10;
 type PoojaDateFilter = "today" | "tomorrow" | "week" | "month" | "all" | "custom";
 
 function todayInputValue() {
-  const date = new Date();
+  return inputValueOf(new Date());
+}
+
+function inputValueOf(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -66,19 +72,22 @@ function capitalizeRelation(relation: Beneficiary["relation"]): PoojaRegisterRow
 }
 
 export function PoojaRegister({
-  initialRows,
+  initialPage,
+  initialCalendarCounts,
   devotees,
   beneficiaries,
   initialDate,
   className = "",
 }: {
-  initialRows: PoojaRegisterRow[];
+  initialPage: PageResult<PoojaRegisterRow>;
+  initialCalendarCounts: Record<number, number>;
   devotees: DevoteeDirectoryRow[];
   beneficiaries: Beneficiary[];
   initialDate?: string;
   className?: string;
 }) {
-  const [rows, setRows] = useState(initialRows);
+  const [rows, setRows] = useState(initialPage.items);
+  const [total, setTotal] = useState(initialPage.total);
   const [dateFilter, setDateFilter] = useState(
     initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : todayInputValue,
   );
@@ -87,49 +96,37 @@ export function PoojaRegister({
   );
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [calendarView, setCalendarView] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const value = initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : todayInputValue();
+    return new Date(`${value}T00:00:00`);
+  });
   const [selected, setSelected] = useState<PoojaRegisterRow>();
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
+  const [calendarCounts, setCalendarCounts] = useState(initialCalendarCounts);
+  const [, startLoading] = useTransition();
 
-  const visibleRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    const today = new Date(`${todayInputValue()}T00:00:00`);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const monday = new Date(today);
-    const weekday = monday.getDay();
-    monday.setDate(monday.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      startLoading(async () => {
+        const result = await loadPoojaRegister({ mode: dateFilterMode, date: dateFilter || todayInputValue(), search: query, page });
+        setRows(result.items);
+        setTotal(result.total);
+      });
+    }, query ? 250 : 0);
+    return () => window.clearTimeout(timer);
+  }, [dateFilter, dateFilterMode, page, query]);
 
-    function matchesAnnualDate(row: PoojaRegisterRow, date: Date) {
-      return row.annualMonth === date.getMonth() + 1 && row.annualDay === date.getDate();
-    }
-
-    return rows.filter((row) => {
-      let dateMatches = true;
-      if (dateFilterMode === "today") dateMatches = matchesAnnualDate(row, today);
-      if (dateFilterMode === "tomorrow") dateMatches = matchesAnnualDate(row, tomorrow);
-      if (dateFilterMode === "month") dateMatches = row.annualMonth === today.getMonth() + 1;
-      if (dateFilterMode === "custom") {
-        const customDate = dateFilter ? new Date(`${dateFilter}T00:00:00`) : undefined;
-        dateMatches = Boolean(customDate && matchesAnnualDate(row, customDate));
-      }
-      if (dateFilterMode === "week") {
-        dateMatches = Array.from({ length: 7 }, (_, index) => {
-          const date = new Date(monday);
-          date.setDate(date.getDate() + index);
-          return date;
-        }).some((date) => matchesAnnualDate(row, date));
-      }
-      const queryMatches =
-        !normalizedQuery ||
-        [row.sponsorName, row.beneficiaryName, row.phone ?? "", row.relation]
-          .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
-      return dateMatches && queryMatches;
+  useEffect(() => {
+    startLoading(async () => {
+      setCalendarCounts(await loadPoojaCalendar(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1));
     });
-  }, [dateFilter, dateFilterMode, query, rows]);
-  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  }, [calendarMonth]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activePage = Math.min(page, totalPages);
-  const paginatedRows = visibleRows.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE);
+  const paginatedRows = rows;
   const activeDateLabel = useMemo(() => {
     const today = new Date(`${todayInputValue()}T00:00:00`);
     if (dateFilterMode === "all") return null;
@@ -156,6 +153,36 @@ export function PoojaRegister({
     return `This month · ${displayFullDate(firstDay)} – ${displayFullDate(lastDay)}`;
   }, [dateFilter, dateFilterMode]);
 
+  const labelsHref = useMemo(() => {
+    const today = new Date(`${todayInputValue()}T00:00:00`);
+    const params = new URLSearchParams();
+    if (dateFilterMode === "tomorrow") {
+      params.set("mode", "tomorrow");
+    } else if (dateFilterMode === "custom" && dateFilter) {
+      params.set("mode", "custom");
+      params.set("date", dateFilter);
+    } else if (dateFilterMode === "week") {
+      const monday = new Date(today);
+      const weekday = monday.getDay();
+      monday.setDate(monday.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      params.set("mode", "range");
+      params.set("from", inputValueOf(monday));
+      params.set("to", inputValueOf(sunday));
+    } else if (dateFilterMode === "month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      params.set("mode", "range");
+      params.set("from", inputValueOf(firstDay));
+      params.set("to", inputValueOf(lastDay));
+    } else if (dateFilterMode === "all") {
+      params.set("mode", "beneficiaries");
+    }
+    const query = params.toString();
+    return `/labels${query ? `?${query}` : ""}`;
+  }, [dateFilter, dateFilterMode]);
+
   function saveRow(updated: PoojaRegisterRow) {
     setRows((current) => current.map((row) => row.enrollmentId === updated.enrollmentId ? updated : row));
     setSelected(undefined);
@@ -170,7 +197,12 @@ export function PoojaRegister({
           <h1>Poojas</h1>
           <p>Choose a date to see its annual poojas. Open any record to review or edit the enrollment.</p>
         </div>
-        <Button onClick={() => setAdding(true)}><Plus size={18} /> Add Pooja</Button>
+        <div className="page-intro-actions">
+          <Link className="ui-button ui-button-outline" href={labelsHref}>
+            <Printer size={18} /> Generate Labels
+          </Link>
+          <Button onClick={() => setAdding(true)}><Plus size={18} /> Add Pooja</Button>
+        </div>
       </div>
 
       {savedMessage && (
@@ -192,7 +224,7 @@ export function PoojaRegister({
               <Button
                 key={value}
                 variant={dateFilterMode === value ? "primary" : "outline"}
-                onClick={() => { setDateFilterMode(value); setPage(1); }}
+                onClick={() => { setDateFilterMode(value); setPage(1); setCalendarView(false); }}
               >
                 {label}
               </Button>
@@ -209,20 +241,53 @@ export function PoojaRegister({
             />
           </label>
 
-          <label className="pooja-date-filter">
-            <span>Custom date</span>
-            <span className={`pooja-filter-control ${dateFilterMode === "custom" ? "active" : ""}`}>
-              <CalendarDays size={18} aria-hidden="true" />
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(event) => { setDateFilter(event.target.value); setDateFilterMode("custom"); setPage(1); }}
-                onFocus={() => setDateFilterMode("custom")}
-                aria-label="Filter poojas by custom annual date"
-              />
-            </span>
-          </label>
+          <div className="pooja-custom-date-group">
+            <label className="pooja-date-filter">
+              <span>Custom date</span>
+              <span className={`pooja-filter-control ${dateFilterMode === "custom" ? "active" : ""}`}>
+                <CalendarDays size={18} aria-hidden="true" />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(event) => {
+                    setDateFilter(event.target.value);
+                    setDateFilterMode("custom");
+                    setPage(1);
+                    setCalendarView(false);
+                    if (event.target.value) setCalendarMonth(new Date(`${event.target.value}T00:00:00`));
+                  }}
+                  onFocus={() => setDateFilterMode("custom")}
+                  aria-label="Filter poojas by custom annual date"
+                />
+              </span>
+            </label>
+            <Button
+              variant={calendarView ? "primary" : "outline"}
+              aria-expanded={calendarView}
+              onClick={() => {
+                if (!calendarView && dateFilter) setCalendarMonth(new Date(`${dateFilter}T00:00:00`));
+                setCalendarView((current) => !current);
+              }}
+            >
+              <CalendarDays size={17} /> {calendarView ? "Hide Calendar" : "Calendar View"}
+            </Button>
+          </div>
         </div>
+        {calendarView ? (
+          <PoojaMonthCalendar
+            month={calendarMonth}
+            counts={calendarCounts}
+            selectedDate={dateFilter}
+            onMonthChange={setCalendarMonth}
+            onSelectDate={(value) => {
+              setDateFilter(value);
+              setDateFilterMode("custom");
+              setPage(1);
+              setCalendarView(false);
+            }}
+          />
+        ) : (
+        <>
         {activeDateLabel && (
           <div className="pooja-active-date" role="status">
             <CalendarDays size={16} aria-hidden="true" />
@@ -240,7 +305,7 @@ export function PoojaRegister({
         </div>
 
         <div className="pooja-list" aria-live="polite">
-          {visibleRows.length === 0 ? (
+          {total === 0 ? (
             <div className="empty-state">
               <CalendarDays size={30} aria-hidden="true" />
               <strong>No poojas found</strong>
@@ -272,6 +337,7 @@ export function PoojaRegister({
                   <span className="pooja-list-phone mono">{row.phone ?? "Phone missing"}</span>
                   <span className="pooja-list-date">
                     <strong>{recurringDate(row)}</strong>
+                    <small className="mono">{row.poojaNo}</small>
                   </span>
                   <span className="pooja-list-address">
                     {[row.addressCity, row.postalCode].filter(Boolean).join(" — ") || "Address missing"}
@@ -284,10 +350,10 @@ export function PoojaRegister({
             })
           )}
         </div>
-        {visibleRows.length > 0 && (
+        {total > 0 && (
           <nav className="list-pagination" aria-label="Pooja pages">
             <span>
-              Showing {(activePage - 1) * PAGE_SIZE + 1}–{Math.min(activePage * PAGE_SIZE, visibleRows.length)} of {visibleRows.length}
+              Showing {(activePage - 1) * PAGE_SIZE + 1}–{Math.min(activePage * PAGE_SIZE, total)} of {total}
             </span>
             <div>
               <Button variant="outline" disabled={activePage === 1} onClick={() => setPage(activePage - 1)}>
@@ -300,9 +366,11 @@ export function PoojaRegister({
             </div>
           </nav>
         )}
+        </>
+        )}
       </section>
 
-      <footer className="page-footer"><span /> Kambaru Sri Durgaparameshwari Temple <span /></footer>
+      <PageFooter />
 
       {selected && (
         <PoojaEditor
@@ -326,6 +394,76 @@ export function PoojaRegister({
           }}
         />
       )}
+    </section>
+  );
+}
+
+function PoojaMonthCalendar({
+  month,
+  counts,
+  selectedDate,
+  onMonthChange,
+  onSelectDate,
+}: {
+  month: Date;
+  counts: Record<number, number>;
+  selectedDate: string;
+  onMonthChange: (month: Date) => void;
+  onSelectDate: (value: string) => void;
+}) {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leadingBlanks = new Date(year, monthIndex, 1).getDay();
+  const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
+  const today = todayInputValue();
+  const monthLabel = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(month);
+  const monthTotal = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+  function inputValue(day: number) {
+    return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  return (
+    <section className="pooja-calendar" aria-label={`Pooja calendar for ${monthLabel}`}>
+      <header className="pooja-calendar-header">
+        <Button variant="outline" aria-label="Previous month" onClick={() => onMonthChange(new Date(year, monthIndex - 1, 1))}>
+          <ChevronLeft size={18} /> Previous
+        </Button>
+        <div>
+          <span className="eyebrow">Monthly pooja calendar</span>
+          <h2>{monthLabel}</h2>
+          <span className="pooja-calendar-month-total">{monthTotal} {monthTotal === 1 ? "pooja" : "poojas"} this month</span>
+        </div>
+        <Button variant="outline" aria-label="Next month" onClick={() => onMonthChange(new Date(year, monthIndex + 1, 1))}>
+          Next <ChevronRight size={18} />
+        </Button>
+      </header>
+      <div className="pooja-calendar-weekdays" aria-hidden="true">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <span className={day === 'Sun' ? 'sunday' : ''} key={day}>{day}</span>)}
+      </div>
+      <div className="pooja-calendar-grid">
+        {Array.from({ length: cellCount }, (_, index) => {
+          const day = index - leadingBlanks + 1;
+          if (day < 1 || day > daysInMonth) return <span className="pooja-calendar-blank" key={`blank-${index}`} aria-hidden="true" />;
+          const value = inputValue(day);
+          const count = counts[day] ?? 0;
+          const loadClass = count >= 6 ? "pooja-load-high" : count >= 3 ? "pooja-load-medium" : count > 0 ? "pooja-load-low" : "";
+          const isSunday = index % 7 === 0;
+          return (
+            <button
+              className={`${count > 0 ? "has-poojas" : ""} ${loadClass} ${isSunday ? "sunday" : ""} ${value === selectedDate ? "selected" : ""} ${value === today ? "today" : ""}`.trim()}
+              key={value}
+              type="button"
+              onClick={() => onSelectDate(value)}
+              aria-label={`${displayFullDate(new Date(`${value}T00:00:00`))}, ${count} ${count === 1 ? "pooja" : "poojas"}`}
+            >
+              <strong>{day}</strong>
+              <span>{count} {count === 1 ? "Pooja" : "Poojas"}</span>
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -557,15 +695,18 @@ function AddPoojaModal({
   onSave: (row: PoojaRegisterRow) => void;
 }) {
   const [devoteeMode, setDevoteeMode] = useState<"existing" | "new">("existing");
+  const [availableDevotees, setAvailableDevotees] = useState(devotees);
+  const [availableBeneficiaries, setAvailableBeneficiaries] = useState(beneficiaries);
   const [devoteeId, setDevoteeId] = useState("");
   const [devoteeSearch, setDevoteeSearch] = useState("");
+  const [isDevoteeSearchOpen, setIsDevoteeSearchOpen] = useState(false);
   const [quickDevoteeNo, setQuickDevoteeNo] = useState("");
-  const selectedDevotee = devotees.find((item) => item.id === devoteeId);
+  const selectedDevotee = availableDevotees.find((item) => item.id === devoteeId);
   const devoteeBeneficiaries = selectedDevotee
-    ? beneficiaries.filter((item) => item.devoteeId === selectedDevotee.id)
+    ? availableBeneficiaries.filter((item) => item.devoteeId === selectedDevotee.id)
     : [];
   const [selectedBeneficiaryId, setSelectedBeneficiaryId] = useState("");
-  const matchingDevotees = devotees.filter((item) => {
+  const matchingDevotees = availableDevotees.filter((item) => {
     const search = devoteeSearch.trim().toLocaleLowerCase();
     return Boolean(search) && [item.fullName, item.devoteeNo, item.phone ?? ""]
       .some((value) => value.toLocaleLowerCase().includes(search));
@@ -604,6 +745,19 @@ function AddPoojaModal({
   const [enrollmentDate, setEnrollmentDate] = useState(todayInputValue);
   const [error, setError] = useState<string>();
   const [isSaving, startSaving] = useTransition();
+
+  useEffect(() => {
+    if (!devoteeSearch.trim()) return;
+    const timer = window.setTimeout(() => {
+      startSaving(async () => setAvailableDevotees(await searchDevotees(devoteeSearch)));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [devoteeSearch]);
+
+  useEffect(() => {
+    if (!devoteeId) return;
+    startSaving(async () => setAvailableBeneficiaries(await loadBeneficiaries(devoteeId)));
+  }, [devoteeId]);
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -645,18 +799,23 @@ function AddPoojaModal({
 
   function selectByDevoteeNumber() {
     const entered = quickDevoteeNo.trim().toLocaleLowerCase();
-    const numericPart = entered.replace(/^dev-?/, "").replace(/^0+/, "");
-    const match = devotees.find((item) =>
-      item.devoteeNo.toLocaleLowerCase() === entered ||
-      item.devoteeNo.replace(/^DEV-0*/i, "") === numericPart,
-    );
-    if (!match) {
-      setError("No devotee was found with that Devotee ID.");
-      return;
-    }
-    setDevoteeId(match.id);
-    setDevoteeSearch("");
-    setError(undefined);
+    const numericPart = entered.replace(/^(?:kdp-)?dev-?/i, "").replace(/^0+/, "");
+    startSaving(async () => {
+      const matches = await searchDevotees(quickDevoteeNo);
+      const match = matches.find((item) =>
+        item.devoteeNo.toLocaleLowerCase() === entered ||
+        item.devoteeNo.replace(/^(?:KDP-)?DEV-0*/i, "") === numericPart,
+      );
+      if (!match) {
+        setError("No devotee was found with that Devotee ID.");
+        return;
+      }
+      setAvailableDevotees((current) => [match, ...current.filter((item) => item.id !== match.id)]);
+      setDevoteeId(match.id);
+      setDevoteeSearch("");
+      setIsDevoteeSearchOpen(false);
+      setError(undefined);
+    });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -822,13 +981,15 @@ function AddPoojaModal({
                       onChange={(event) => {
                         const value = event.target.value;
                         setDevoteeSearch(value);
+                        setIsDevoteeSearchOpen(Boolean(value.trim()));
                       }}
+                      onFocus={() => setIsDevoteeSearchOpen(Boolean(devoteeSearch.trim()))}
                       placeholder="Start typing a devotee name or phone…"
                       autoComplete="off"
                     />
                   </span>
                 </FormField>
-                {devoteeSearch.trim() && (
+                {devoteeSearch.trim() && isDevoteeSearchOpen && (
                   <div className="devotee-typeahead-results" role="listbox" aria-label="Matching devotees">
                     {matchingDevotees.length === 0 ? (
                       <span className="typeahead-empty">No devotees match “{devoteeSearch}”.</span>
@@ -836,7 +997,11 @@ function AddPoojaModal({
                       <button
                         className={devotee.id === devoteeId ? "selected" : ""}
                         key={devotee.id}
-                        onClick={() => { setDevoteeId(devotee.id); setError(undefined); }}
+                        onClick={() => {
+                          setDevoteeId(devotee.id);
+                          setIsDevoteeSearchOpen(false);
+                          setError(undefined);
+                        }}
                         type="button"
                         role="option"
                         aria-selected={devotee.id === devoteeId}

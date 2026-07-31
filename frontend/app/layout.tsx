@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
 import { StaffSessionProvider, type StaffSession } from "@/components/auth/StaffSessionProvider";
+import { NavigationFeedback } from "@/components/NavigationFeedback";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import logo from "@/assets/logo.png";
 import "./globals.css";
 import "./dashboard.css";
 
 export const metadata: Metadata = {
-  title: "Kambaru Devi Seva — Admin",
-  description: "Shashwatha Pooja register for Kambaru Sri Durgaparameshwari Temple",
+  title: {
+    default: "Kambaramma — Temple Administration",
+    template: "%s | Kambaramma",
+  },
+  description: "Shashwatha Pooja register for Shree Durgaparameshwari Temple Kambar",
+  icons: {
+    icon: [{ url: logo.src, type: "image/png" }],
+    shortcut: [{ url: logo.src, type: "image/png" }],
+    apple: [{ url: logo.src, type: "image/png" }],
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -31,7 +41,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   return (
     <html lang="en">
-      <body><StaffSessionProvider staff={staff}>{children}</StaffSessionProvider></body>
+      <body>
+        <StaffSessionProvider staff={staff}>
+          <NavigationFeedback />
+          {children}
+        </StaffSessionProvider>
+      </body>
     </html>
   );
 }

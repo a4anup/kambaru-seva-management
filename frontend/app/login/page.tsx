@@ -3,7 +3,7 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = {
-  title: "Staff Sign In — Kambaru Sri Durgaparameshwari Temple",
+  title: "Staff Sign In",
   description: "Authorized staff access to the Shashwatha Pooja Management Application.",
 };
 

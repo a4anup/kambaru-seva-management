@@ -1,6 +1,6 @@
 "use server";
 
-import type { DevoteeDirectoryRow } from "@kambaru/backend";
+import type { DevoteeDirectoryPage, DevoteeDirectoryRow } from "@kambaru/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getBackendServices } from "@/lib/server/backend";
@@ -8,7 +8,7 @@ import { getBackendServices } from "@/lib/server/backend";
 const optionalText = z.string().trim().max(500).optional().transform((value) => value || undefined);
 const devoteeInput = z.object({
   id: z.string().uuid().optional(),
-  expectedModifiedAt: z.string().datetime().optional(),
+  expectedModifiedAt: z.string().datetime({ offset: true }).optional(),
   fullName: z.string().trim().min(1, "Devotee name is required.").max(200),
   dateOfBirth: z.string().date().optional().or(z.literal("")).transform((value) => value || undefined),
   phone: z.string().trim().max(30).optional().transform((value) => value || undefined),
@@ -37,6 +37,15 @@ const devoteeInput = z.object({
 export type SaveDevoteeResult =
   | { ok: true; devotee: DevoteeDirectoryRow }
   | { ok: false; message: string };
+
+export async function loadDevoteeDirectory(input: {
+  search?: string;
+  letter?: string;
+  page?: number;
+}): Promise<DevoteeDirectoryPage> {
+  const { devotees } = await getBackendServices();
+  return devotees.listDirectoryPage({ ...input, pageSize: 10 });
+}
 
 export async function saveDevotee(input: unknown): Promise<SaveDevoteeResult> {
   const parsed = devoteeInput.safeParse(input);

@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useState, useTransition } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Pencil, Phone, Plus, Search, TriangleAlert, Users, X } from "lucide-react";
-import type { DevoteeDirectoryRow } from "@kambaru/backend";
+import type { DevoteeDirectoryPage, DevoteeDirectoryRow } from "@kambaru/backend";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
-import { saveDevotee } from "@/app/devotees/actions";
+import { loadDevoteeDirectory, saveDevotee } from "@/app/devotees/actions";
+import { PageFooter } from "@/components/PageFooter";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const PAGE_SIZE = 10;
@@ -30,43 +31,40 @@ function ageFromDateOfBirth(value: string) {
 }
 
 export function DevoteeDirectory({
-  initialRows,
+  initialPage,
   className = "",
 }: {
-  initialRows: DevoteeDirectoryRow[];
+  initialPage: DevoteeDirectoryPage;
   className?: string;
 }) {
-  const [rows, setRows] = useState(initialRows);
+  const [rows, setRows] = useState(initialPage.items);
+  const [total, setTotal] = useState(initialPage.total);
+  const [allTotal, setAllTotal] = useState(initialPage.allTotal);
+  const [letterCounts, setLetterCounts] = useState(initialPage.letterCounts);
   const [letter, setLetter] = useState("ALL");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<DevoteeDirectoryRow>();
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
+  const [, startLoading] = useTransition();
 
-  const letterCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    rows.forEach((row) => {
-      const initial = row.fullName.trim().charAt(0).toUpperCase();
-      counts.set(initial, (counts.get(initial) ?? 0) + 1);
-    });
-    return counts;
-  }, [rows]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      startLoading(async () => {
+        const result = await loadDevoteeDirectory({ search: query, letter, page });
+        setRows(result.items);
+        setTotal(result.total);
+        setAllTotal(result.allTotal);
+        setLetterCounts(result.letterCounts);
+      });
+    }, query ? 250 : 0);
+    return () => window.clearTimeout(timer);
+  }, [letter, page, query]);
 
-  const visibleRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return rows.filter((row) => {
-      const matchesLetter = letter === "ALL" || row.fullName.toUpperCase().startsWith(letter);
-      const matchesQuery =
-        !normalizedQuery ||
-        [row.fullName, row.devoteeNo, row.phone ?? "", row.city]
-          .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
-      return matchesLetter && matchesQuery;
-    });
-  }, [rows, letter, query]);
-  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activePage = Math.min(page, totalPages);
-  const paginatedRows = visibleRows.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE);
+  const paginatedRows = rows;
 
   function saveRow(updated: DevoteeDirectoryRow) {
     setRows((current) => current.map((row) => row.id === updated.id ? updated : row));
@@ -89,7 +87,7 @@ export function DevoteeDirectory({
         <div className="alphabet-heading">
           <div>
             <h2>Browse by name</h2>
-            <span>{rows.length} registered devotees</span>
+            <span>{allTotal} registered devotees</span>
           </div>
           <label className="resource-search devotee-search">
             <Search size={17} aria-hidden="true" />
@@ -110,10 +108,10 @@ export function DevoteeDirectory({
             aria-pressed={letter === "ALL"}
           >
             <strong>All</strong>
-            <small>{rows.length}</small>
+            <small>{allTotal}</small>
           </button>
           {LETTERS.map((item) => {
-            const count = letterCounts.get(item) ?? 0;
+            const count = letterCounts[item] ?? 0;
             return (
               <button
                 className={`alphabet-tile ${letter === item ? "active" : ""}`}
@@ -136,7 +134,7 @@ export function DevoteeDirectory({
         <header className="devotee-results-header">
           <div>
             <h2>{letter === "ALL" ? "All devotees" : `${letter} devotees`}</h2>
-            <span>{visibleRows.length} {visibleRows.length === 1 ? "record" : "records"}</span>
+            <span>{total} {total === 1 ? "record" : "records"}</span>
           </div>
         </header>
 
@@ -151,7 +149,7 @@ export function DevoteeDirectory({
         </div>
 
         <div className="devotee-list" aria-live="polite">
-          {visibleRows.length === 0 ? (
+          {total === 0 ? (
             <div className="empty-state">
               <Users size={30} aria-hidden="true" />
               <strong>No devotees found</strong>
@@ -183,10 +181,10 @@ export function DevoteeDirectory({
             </article>
           ))}
         </div>
-        {visibleRows.length > 0 && (
+        {total > 0 && (
           <nav className="list-pagination" aria-label="Devotee pages">
             <span>
-              Showing {(activePage - 1) * PAGE_SIZE + 1}–{Math.min(activePage * PAGE_SIZE, visibleRows.length)} of {visibleRows.length}
+              Showing {(activePage - 1) * PAGE_SIZE + 1}–{Math.min(activePage * PAGE_SIZE, total)} of {total}
             </span>
             <div>
               <Button variant="outline" disabled={activePage === 1} onClick={() => setPage(activePage - 1)}>
@@ -207,7 +205,7 @@ export function DevoteeDirectory({
         </Alert>
       )}
 
-      <footer className="page-footer"><span /> Kambaru Sri Durgaparameshwari Temple <span /></footer>
+      <PageFooter />
 
       {selected && (
         <DevoteeEditor
@@ -236,7 +234,10 @@ export function DevoteeDirectory({
           isNew
           onClose={() => setAdding(false)}
           onSave={(created) => {
-            setRows((current) => [...current, created].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+            setRows((current) => [created, ...current].slice(0, PAGE_SIZE));
+            setTotal((current) => current + 1);
+            setAllTotal((current) => current + 1);
+            setLetterCounts((current) => ({ ...current, [created.fullName.charAt(0).toUpperCase()]: (current[created.fullName.charAt(0).toUpperCase()] ?? 0) + 1 }));
             setAdding(false);
             setSavedMessage(`${created.fullName}'s profile was added.`);
           }}

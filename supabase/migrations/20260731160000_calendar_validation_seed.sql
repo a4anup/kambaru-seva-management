@@ -1,0 +1,6 @@
+-- Intentionally empty in source control.
+--
+-- This migration version was used once to load the synthetic calendar-validation
+-- dataset into the linked development project. The actual repeatable seed remains
+-- under supabase/seeds/calendar_validation.sql so a new or production project never
+-- receives validation data through its migration chain.

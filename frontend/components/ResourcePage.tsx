@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { StatusBadge, type DisplayStatus } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PageFooter } from "@/components/PageFooter";
 
 export interface ResourceRow {
   primary: string;
@@ -59,7 +60,7 @@ export function ResourcePage({
             ))}
           </div>
         </Card>
-        <footer className="page-footer"><span /> Kambaru Sri Durgaparameshwari Temple <span /></footer>
+        <PageFooter />
       </section>
     </AppShell>
   );

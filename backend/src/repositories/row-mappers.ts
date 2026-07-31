@@ -38,6 +38,7 @@ export interface BeneficiaryRow {
 
 export interface EnrollmentRow {
   id: string;
+  pooja_no: string;
   devotee_id: string;
   for_self: boolean;
   beneficiary_id: string | null;
@@ -107,6 +108,7 @@ export function mapEnrollment(row: EnrollmentRow): PoojaEnrollment & { exception
   const hasCustomAddress = row.address_mode === "custom";
   return {
     id: row.id,
+    poojaNo: row.pooja_no,
     devoteeId: row.devotee_id,
     forSelf: row.for_self,
     beneficiaryId: row.beneficiary_id,

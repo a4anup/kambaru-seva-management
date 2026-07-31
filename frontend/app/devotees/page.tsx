@@ -6,7 +6,7 @@ export default async function DevoteesPage() {
   const services = await getBackendServices();
   return (
     <AppShell title="Devotees">
-      <DevoteeDirectory initialRows={await services.devotees.listDirectory()} />
+      <DevoteeDirectory initialPage={await services.devotees.listDirectoryPage()} />
     </AppShell>
   );
 }

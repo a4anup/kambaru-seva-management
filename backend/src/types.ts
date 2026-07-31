@@ -50,6 +50,7 @@ export interface Beneficiary {
 
 export interface PoojaEnrollment {
   id: string;
+  poojaNo: string;
   devoteeId: string;
   forSelf: boolean;
   beneficiaryId: string | null;
@@ -99,6 +100,7 @@ export interface DaySummary {
 /** Display/edit shape for the date-filtered Shashwatha Pooja register. */
 export interface PoojaRegisterRow {
   enrollmentId: string;
+  poojaNo: string;
   devoteeId: string;
   beneficiaryId: string | null;
   sponsorName: string;
@@ -212,4 +214,95 @@ export interface SaveEnrollmentInput {
   paymentReference?: string;
   enrollmentDate?: string;
   notes?: string;
+}
+
+export interface PageResult<T> {
+  items: T[];
+  total: number;
+}
+
+export interface DevoteeDirectoryPage extends PageResult<DevoteeDirectoryRow> {
+  allTotal: number;
+  letterCounts: Record<string, number>;
+}
+
+export type PoojaRegisterFilterMode = "today" | "tomorrow" | "week" | "month" | "all" | "custom";
+
+export interface DashboardSummary {
+  todayCount: number;
+  weekCount: number;
+  activeCount: number;
+  devoteeCount: number;
+  dailyCounts: Array<{ date: string; count: number }>;
+}
+
+/** A single deduplicated courier-label recipient (used by both date-based and bulk invitation label modes). */
+export interface LabelRecipient {
+  id: string;
+  name: string;
+  phone: string | null;
+  addressLine: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+}
+
+export type LabelDateMode = "today" | "tomorrow" | "custom" | "range";
+export type LabelInvitationScope = "all" | "devotees" | "beneficiaries";
+
+export type ReportGroupBy = "date" | "pincode" | "devotee" | "rashi" | "gotra" | "nakshatra" | "state";
+
+export interface ReportFilters {
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+  pincode?: string;
+  state?: string;
+  rashi?: string;
+  gotra?: string;
+  nakshatra?: string;
+  relation?: string;
+  addressMode?: string;
+  status?: string;
+}
+
+export interface ReportRow {
+  enrollmentId: string;
+  devoteeNo: string;
+  sponsorName: string;
+  beneficiaryName: string;
+  relation: string;
+  phone: string | null;
+  rashi: string;
+  nakshatra: string;
+  gotra: string;
+  addressCity: string;
+  state: string;
+  postalCode: string;
+  addressMode: "devotee_primary" | "custom";
+  status: EnrollmentStatus;
+  annualMonth: number;
+  annualDay: number;
+}
+
+export interface ReportGroupCount {
+  label: string;
+  count: number;
+}
+
+export interface ReportFilterOptions {
+  states: string[];
+  rashis: string[];
+  gotras: string[];
+  nakshatras: string[];
+  pincodes: string[];
+}
+
+export interface ReportPage extends PageResult<ReportRow> {
+  activeCount: number;
+  uniqueDevotees: number;
+  incompleteCount: number;
+  groups: ReportGroupCount[];
+  filterOptions: ReportFilterOptions;
 }

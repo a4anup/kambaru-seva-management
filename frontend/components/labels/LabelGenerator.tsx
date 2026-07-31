@@ -1,48 +1,80 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import type { DevoteeDirectoryRow, PoojaRegisterRow } from "@kambaru/backend";
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import type { LabelRecipient } from "@kambaru/backend";
 import {
   CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Printer,
   RotateCcw,
+  Ruler,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { PageFooter } from "@/components/PageFooter";
+import { getInvitationLabels, getLabelsForDate } from "@/app/labels/actions";
 
-type DateChoice = "today" | "tomorrow" | "custom" | "all";
+type DateChoice = "today" | "tomorrow" | "custom" | "range" | "all" | "devotees" | "beneficiaries";
 
-interface LabelRecipient {
-  id: string;
-  name: string;
-  phone: string | null;
-  addressLine: string;
-  addressLine2?: string;
-  city: string;
-  state: string;
-  postalCode: string;
-}
+const LABEL_LAYOUTS = {
+  compact: { label: "Compact", width: 58, height: 50 },
+  standard: { label: "Standard", width: 58, height: 63 },
+  large: { label: "Large", width: 90, height: 63 },
+} as const;
+
+type LabelLayoutKey = keyof typeof LABEL_LAYOUTS;
 
 const TEMPLE_TIME_ZONE = "Asia/Kolkata";
 
-function dateParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TEMPLE_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+const LABEL_SETTINGS_STORAGE_KEY = "kambaru:label-settings";
 
-  return {
-    year: Number(parts.find((part) => part.type === "year")?.value),
-    month: Number(parts.find((part) => part.type === "month")?.value),
-    day: Number(parts.find((part) => part.type === "day")?.value),
-  };
+interface LabelAppearanceSettings {
+  labelLayoutKey: LabelLayoutKey | "custom";
+  labelWidthMm: number;
+  labelHeightMm: number;
+  nameFontSize: number;
+  addressFontSize: number;
+  phoneFontSize: number;
+  nameColor: string;
+  addressColor: string;
+  phoneColor: string;
 }
 
-function inputDate(date: Date) {
-  const { year, month, day } = dateParts(date);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+const DEFAULT_LABEL_SETTINGS: LabelAppearanceSettings = {
+  labelLayoutKey: "compact",
+  labelWidthMm: 58,
+  labelHeightMm: 50,
+  nameFontSize: 13,
+  addressFontSize: 10,
+  phoneFontSize: 9.5,
+  nameColor: "#292521",
+  addressColor: "#292521",
+  phoneColor: "#4f4944",
+};
+
+const RESET_LABEL_SETTINGS: LabelAppearanceSettings = {
+  labelLayoutKey: "custom",
+  labelWidthMm: 90,
+  labelHeightMm: 50,
+  nameFontSize: 15.5,
+  addressFontSize: 15,
+  phoneFontSize: 11.5,
+  nameColor: "#292521",
+  addressColor: "#292521",
+  phoneColor: "#4f4944",
+};
+
+function loadStoredLabelSettings(): LabelAppearanceSettings | null {
+  try {
+    const raw = window.localStorage.getItem(LABEL_SETTINGS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LabelAppearanceSettings>;
+    return { ...DEFAULT_LABEL_SETTINGS, ...parsed };
+  } catch {
+    return null;
+  }
 }
 
 function addDays(date: Date, days: number) {
@@ -61,15 +93,15 @@ function displayDate(value: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-function isLeapYear(year: number) {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-}
-
-function isDueOn(row: PoojaRegisterRow, value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  if (row.status !== "active") return false;
-  if (row.annualMonth === month && row.annualDay === day) return true;
-  return row.annualMonth === 2 && row.annualDay === 29 && month === 2 && day === 28 && !isLeapYear(year);
+function inputDate(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TEMPLE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 function chunk<T>(items: T[], size: number) {
@@ -78,86 +110,122 @@ function chunk<T>(items: T[], size: number) {
   );
 }
 
-function normalizeAddress(recipient: LabelRecipient) {
-  return [
-    recipient.addressLine,
-    recipient.addressLine2,
-    recipient.city,
-    recipient.state,
-    recipient.postalCode,
-  ]
-    .filter(Boolean)
-    .join("|")
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9|]/g, "");
-}
-
 export function LabelGenerator({
-  enrollments,
-  devotees,
+  initialRecipients,
+  initialDate,
+  initialChoice = "today",
+  initialCustomDate,
+  initialRangeFrom,
+  initialRangeTo,
 }: {
-  enrollments: PoojaRegisterRow[];
-  devotees: DevoteeDirectoryRow[];
+  initialRecipients: LabelRecipient[];
+  initialDate: string;
+  initialChoice?: DateChoice;
+  initialCustomDate?: string;
+  initialRangeFrom?: string;
+  initialRangeTo?: string;
 }) {
-  const now = useMemo(() => new Date(), []);
-  const today = useMemo(() => inputDate(now), [now]);
+  const now = useMemo(() => new Date(`${initialDate}T00:00:00`), [initialDate]);
+  const today = initialDate;
   const tomorrow = useMemo(() => inputDate(addDays(now, 1)), [now]);
-  const [choice, setChoice] = useState<DateChoice>("today");
-  const [customDate, setCustomDate] = useState(today);
+  const [choice, setChoice] = useState<DateChoice>(initialChoice);
+  const [customDate, setCustomDate] = useState(initialCustomDate ?? today);
+  const [rangeFrom, setRangeFrom] = useState(initialRangeFrom ?? today);
+  const [rangeTo, setRangeTo] = useState(initialRangeTo ?? inputDate(addDays(now, 7)));
+  const [labelLayoutKey, setLabelLayoutKey] = useState<LabelLayoutKey | "custom">(DEFAULT_LABEL_SETTINGS.labelLayoutKey);
+  const [labelWidthMm, setLabelWidthMm] = useState(DEFAULT_LABEL_SETTINGS.labelWidthMm);
+  const [labelHeightMm, setLabelHeightMm] = useState(DEFAULT_LABEL_SETTINGS.labelHeightMm);
+  const [nameFontSize, setNameFontSize] = useState(DEFAULT_LABEL_SETTINGS.nameFontSize);
+  const [addressFontSize, setAddressFontSize] = useState(DEFAULT_LABEL_SETTINGS.addressFontSize);
+  const [phoneFontSize, setPhoneFontSize] = useState(DEFAULT_LABEL_SETTINGS.phoneFontSize);
+  const [nameColor, setNameColor] = useState(DEFAULT_LABEL_SETTINGS.nameColor);
+  const [addressColor, setAddressColor] = useState(DEFAULT_LABEL_SETTINGS.addressColor);
+  const [phoneColor, setPhoneColor] = useState(DEFAULT_LABEL_SETTINGS.phoneColor);
+  const hasLoadedStoredSettings = useRef(false);
+
+  // Appearance settings are a per-device preference, not application data — persist
+  // them to localStorage so they survive navigating away from and back to Labels.
+  // Deliberately deferred to an effect (not lazy useState init) so the client's
+  // first render still matches the server-rendered HTML, avoiding a hydration
+  // mismatch; the one-time extra render this causes is expected and harmless.
+  useEffect(() => {
+    const stored = loadStoredLabelSettings();
+    if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
+      setLabelLayoutKey(stored.labelLayoutKey);
+      setLabelWidthMm(stored.labelWidthMm);
+      setLabelHeightMm(stored.labelHeightMm);
+      setNameFontSize(stored.nameFontSize);
+      setAddressFontSize(stored.addressFontSize);
+      setPhoneFontSize(stored.phoneFontSize);
+      setNameColor(stored.nameColor);
+      setAddressColor(stored.addressColor);
+      setPhoneColor(stored.phoneColor);
+    }
+    hasLoadedStoredSettings.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStoredSettings.current) return;
+    const settings: LabelAppearanceSettings = {
+      labelLayoutKey, labelWidthMm, labelHeightMm, nameFontSize, addressFontSize, phoneFontSize, nameColor, addressColor, phoneColor,
+    };
+    try {
+      window.localStorage.setItem(LABEL_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      // Ignore storage failures (private browsing, quota, etc.) — settings just won't persist.
+    }
+  }, [labelLayoutKey, labelWidthMm, labelHeightMm, nameFontSize, addressFontSize, phoneFontSize, nameColor, addressColor, phoneColor]);
+
+  const labelLayout = {
+    columns: Math.max(1, Math.min(4, Math.floor((186 + 3) / (labelWidthMm + 3)))),
+    rows: Math.max(1, Math.min(8, Math.floor((263 + 3) / (labelHeightMm + 3)))),
+  };
+  const labelsPerPage = labelLayout.columns * labelLayout.rows;
+  const rangeLabel = rangeFrom && rangeTo
+    ? `${displayDate(rangeFrom)} – ${displayDate(rangeTo)}`
+    : "Select from and to dates";
+  const [previewPage, setPreviewPage] = useState(1);
   const selectedDate = choice === "today" ? today : choice === "tomorrow" ? tomorrow : customDate;
-  const allInvitationRecipients = useMemo(() => {
-    const candidates: LabelRecipient[] = [
-      ...devotees.map((devotee) => ({
-        id: `devotee-${devotee.id}`,
-        name: devotee.fullName,
-        phone: devotee.phone,
-        addressLine: devotee.addressLine1,
-        addressLine2: devotee.addressLine2,
-        city: devotee.city === "City missing" ? "" : devotee.city,
-        state: devotee.state,
-        postalCode: /^\d{6}$/.test(devotee.postalCode) ? devotee.postalCode : "",
-      })),
-      ...enrollments.map((row) => ({
-          id: `beneficiary-${row.enrollmentId}`,
-          name: row.beneficiaryName,
-          phone: row.beneficiaryPhone || row.phone,
-          addressLine: row.addressLine,
-          addressLine2: row.addressLine2,
-          city: row.addressCity,
-          state: row.addressState,
-          postalCode: row.postalCode,
-        })),
-    ];
-    const seen = new Set<string>();
-    return candidates.filter((recipient) => {
-      const normalized = normalizeAddress(recipient);
-      const key = normalized || `missing-${recipient.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+  const isInvitationChoice = choice === "all" || choice === "devotees" || choice === "beneficiaries";
+
+  // Each selection fetches only the rows it needs (server-side filtered and, for
+  // invitation modes, deduplicated) — never the whole devotee/enrollment tables.
+  const [matchingRows, setMatchingRows] = useState<LabelRecipient[]>(initialRecipients);
+  const [isPending, startTransition] = useTransition();
+  const isFirstRun = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    let cancelled = false;
+    startTransition(() => {
+      const load = async () => {
+        const rows = isInvitationChoice
+          ? await getInvitationLabels(choice as "all" | "devotees" | "beneficiaries")
+          : choice === "range"
+            ? await getLabelsForDate({ mode: "range", rangeFrom, rangeTo })
+            : await getLabelsForDate({ mode: choice, date: selectedDate });
+        if (!cancelled) setMatchingRows(rows);
+      };
+      void load();
     });
-  }, [devotees, enrollments]);
-  const matchingRows = useMemo<LabelRecipient[]>(() => {
-    if (choice === "all") return allInvitationRecipients;
-    return enrollments
-      .filter((row) => isDueOn(row, selectedDate))
-      .map((row) => ({
-        id: row.enrollmentId,
-        name: row.beneficiaryName,
-        phone: row.phone,
-        addressLine: row.addressLine,
-        addressLine2: row.addressLine2,
-        city: row.addressCity,
-        state: row.addressState,
-        postalCode: row.postalCode,
-      }));
-  }, [allInvitationRecipients, choice, enrollments, selectedDate]);
-  const selectionKey = choice === "all" ? "all-devotees" : selectedDate;
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choice, selectedDate, rangeFrom, rangeTo]);
+
+  const selectionKey = isInvitationChoice ? `all-${choice}` : choice === "range" ? `range-${rangeFrom}-${rangeTo}` : selectedDate;
   const [removedByDate, setRemovedByDate] = useState<Record<string, string[]>>({});
   const previewRef = useRef<HTMLDivElement>(null);
+  const invitationMenuRef = useRef<HTMLDetailsElement>(null);
   const removedIds = removedByDate[selectionKey] ?? [];
   const labels = matchingRows.filter((row) => !removedIds.includes(row.id));
-  const pages = chunk(labels, 15);
+  const pages = chunk(labels, labelsPerPage);
+  const visiblePage = Math.min(previewPage, Math.max(1, pages.length));
 
   function removeLabel(id: string) {
     setRemovedByDate((current) => ({
@@ -168,11 +236,27 @@ export function LabelGenerator({
 
   function restoreLabels() {
     setRemovedByDate((current) => ({ ...current, [selectionKey]: [] }));
+    setPreviewPage(1);
   }
 
-  function showAllInvitationLabels() {
-    setChoice("all");
-    setRemovedByDate((current) => ({ ...current, "all-devotees": [] }));
+  function resetLabelSettings() {
+    setLabelLayoutKey(RESET_LABEL_SETTINGS.labelLayoutKey);
+    setLabelWidthMm(RESET_LABEL_SETTINGS.labelWidthMm);
+    setLabelHeightMm(RESET_LABEL_SETTINGS.labelHeightMm);
+    setNameFontSize(RESET_LABEL_SETTINGS.nameFontSize);
+    setAddressFontSize(RESET_LABEL_SETTINGS.addressFontSize);
+    setPhoneFontSize(RESET_LABEL_SETTINGS.phoneFontSize);
+    setNameColor(RESET_LABEL_SETTINGS.nameColor);
+    setAddressColor(RESET_LABEL_SETTINGS.addressColor);
+    setPhoneColor(RESET_LABEL_SETTINGS.phoneColor);
+    setPreviewPage(1);
+  }
+
+  function showInvitationLabels(nextChoice: Extract<DateChoice, "all" | "devotees" | "beneficiaries">) {
+    invitationMenuRef.current?.removeAttribute("open");
+    setChoice(nextChoice);
+    setPreviewPage(1);
+    setRemovedByDate((current) => ({ ...current, [`all-${nextChoice}`]: [] }));
     window.requestAnimationFrame(() => {
       previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -191,37 +275,103 @@ export function LabelGenerator({
         </Button>
       </div>
 
-      <section className="panel label-controls" aria-label="Label date filter">
+      <div className="label-workspace">
+        <aside className="panel label-filter-column" aria-label="Label date filter">
+          <header><span className="eyebrow">Date filter</span><strong>Choose pooja dates</strong></header>
         <div className="label-date-tabs" role="group" aria-label="Choose label date">
-          <Button variant={choice === "today" ? "primary" : "outline"} onClick={() => setChoice("today")}>
+          <Button variant={choice === "today" ? "primary" : "outline"} onClick={() => { setChoice("today"); setPreviewPage(1); }}>
             Today
           </Button>
-          <Button variant={choice === "tomorrow" ? "primary" : "outline"} onClick={() => setChoice("tomorrow")}>
+          <Button variant={choice === "tomorrow" ? "primary" : "outline"} onClick={() => { setChoice("tomorrow"); setPreviewPage(1); }}>
             Tomorrow
           </Button>
-          <Button variant={choice === "custom" ? "primary" : "outline"} onClick={() => setChoice("custom")}>
-            <CalendarDays size={17} /> Choose date
+          <Button variant={choice === "custom" ? "primary" : "outline"} onClick={() => { setChoice("custom"); setPreviewPage(1); }}>
+            <CalendarDays size={17} /> Single date
+          </Button>
+          <Button variant={choice === "range" ? "primary" : "outline"} onClick={() => { setChoice("range"); setPreviewPage(1); }}>
+            <CalendarDays size={17} /> Date range
           </Button>
         </div>
 
-        <label className={`label-custom-date ${choice !== "custom" ? "is-muted" : ""}`}>
-          <span>Date</span>
-          <input
-            type="date"
-            value={customDate}
-            onChange={(event) => {
-              setCustomDate(event.target.value);
-              setChoice("custom");
-            }}
-          />
-        </label>
+        {choice === "range" ? (
+          <div className="label-date-range">
+            <label className="label-custom-date">
+              <span>From date</span>
+              <input type="date" value={rangeFrom} max={rangeTo || undefined} onChange={(event) => { setRangeFrom(event.target.value); setPreviewPage(1); }} />
+            </label>
+            <label className="label-custom-date">
+              <span>To date</span>
+              <input type="date" value={rangeTo} min={rangeFrom || undefined} onChange={(event) => { setRangeTo(event.target.value); setPreviewPage(1); }} />
+            </label>
+          </div>
+        ) : (
+          <label className={`label-custom-date ${choice !== "custom" ? "is-muted" : ""}`}>
+            <span>Date</span>
+            <input
+              type="date"
+              value={customDate}
+              onChange={(event) => {
+                setCustomDate(event.target.value);
+                setChoice("custom");
+                setPreviewPage(1);
+              }}
+            />
+          </label>
+        )}
 
-        <div className="label-filter-summary">
-          <strong>{choice === "all" ? "All devotee and beneficiary addresses" : displayDate(selectedDate)}</strong>
-          <span>
-            {labels.length} of {matchingRows.length} {choice === "all" ? "unique household labels" : "labels"} selected
-          </span>
-        </div>
+          <div className="label-filter-summary">
+            <strong>{choice === "all" ? "All devotee and beneficiary addresses" : choice === "devotees" ? "All devotee addresses" : choice === "beneficiaries" ? "All beneficiary addresses" : choice === "range" ? rangeLabel : displayDate(selectedDate)}</strong>
+            <span>
+              {isPending ? "Loading…" : `${labels.length} of ${matchingRows.length} ${isInvitationChoice ? "unique address labels" : "labels"} selected`}
+            </span>
+          </div>
+        </aside>
+
+        <aside className="panel label-settings-column" aria-label="Label settings">
+          <header><span className="eyebrow">Label settings</span><strong>Layout and recipients</strong></header>
+        <details className="label-size-designer">
+          <summary className="ui-button ui-button-outline">
+            <Ruler size={17} /> Label size: {labelWidthMm} × {labelHeightMm} mm <ChevronDown size={16} />
+          </summary>
+          <div className="label-size-designer-panel">
+            <label className="label-custom-date">
+              <span>Size preset</span>
+              <select
+                value={labelLayoutKey}
+                onChange={(event) => {
+                  const key = event.target.value as LabelLayoutKey | "custom";
+                  setLabelLayoutKey(key);
+                  if (key !== "custom") {
+                    setLabelWidthMm(LABEL_LAYOUTS[key].width);
+                    setLabelHeightMm(LABEL_LAYOUTS[key].height);
+                  }
+                  setPreviewPage(1);
+                }}
+              >
+                {Object.entries(LABEL_LAYOUTS).map(([key, layout]) => (
+                  <option value={key} key={key}>{layout.label} — {layout.width} × {layout.height} mm</option>
+                ))}
+                <option value="custom">Custom size</option>
+              </select>
+            </label>
+            <label className="label-dimension-slider">
+              <span><b>Width</b><output>{labelWidthMm} mm</output></span>
+              <input type="range" min="40" max="90" step="1" value={labelWidthMm} onChange={(event) => { setLabelWidthMm(Number(event.target.value)); setLabelLayoutKey("custom"); setPreviewPage(1); }} />
+            </label>
+            <label className="label-dimension-slider">
+              <span><b>Height</b><output>{labelHeightMm} mm</output></span>
+              <input type="range" min="30" max="80" step="1" value={labelHeightMm} onChange={(event) => { setLabelHeightMm(Number(event.target.value)); setLabelLayoutKey("custom"); setPreviewPage(1); }} />
+            </label>
+            <div className="label-typography-heading"><strong>Text appearance</strong><span>Live preview and print</span></div>
+            <LabelTextControl label="Name" size={nameFontSize} min={8} max={20} color={nameColor} onSize={setNameFontSize} onColor={setNameColor} />
+            <LabelTextControl label="Address" size={addressFontSize} min={7} max={16} color={addressColor} onSize={setAddressFontSize} onColor={setAddressColor} />
+            <LabelTextControl label="Phone number" size={phoneFontSize} min={7} max={16} color={phoneColor} onSize={setPhoneFontSize} onColor={setPhoneColor} />
+            <small>{labelLayout.columns} columns × {labelLayout.rows} rows · {labelsPerPage} labels fit on each A4 sheet</small>
+            <Button className="label-settings-reset" variant="ghost" onClick={resetLabelSettings}>
+              <RotateCcw size={16} /> Reset label settings
+            </Button>
+          </div>
+        </details>
 
         {removedIds.length > 0 && (
           <Button variant="ghost" onClick={restoreLabels}>
@@ -229,41 +379,71 @@ export function LabelGenerator({
           </Button>
         )}
 
-        <Button
-          className="all-devotee-label-button"
-          variant={choice === "all" ? "primary" : "outline"}
-          onClick={showAllInvitationLabels}
-        >
-          <Printer size={17} /> Generate for All Devotees
-        </Button>
-      </section>
+        <details className="invitation-label-menu" ref={invitationMenuRef}>
+          <summary className="ui-button ui-button-outline">
+            <Printer size={17} /> Generate All Labels <ChevronDown size={16} />
+          </summary>
+          <div className="invitation-label-menu-options" aria-label="Generate all label options">
+            <button className={choice === "all" ? "active" : ""} type="button" onClick={() => showInvitationLabels("all")}>
+              <strong>Devotees + Beneficiaries</strong><span>All unique addresses</span>
+            </button>
+            <button className={choice === "devotees" ? "active" : ""} type="button" onClick={() => showInvitationLabels("devotees")}>
+              <strong>Devotees only</strong><span>Primary devotee addresses</span>
+            </button>
+            <button className={choice === "beneficiaries" ? "active" : ""} type="button" onClick={() => showInvitationLabels("beneficiaries")}>
+              <strong>Beneficiaries only</strong><span>Beneficiary dispatch addresses</span>
+            </button>
+          </div>
+        </details>
+        </aside>
 
+      <main className="panel label-preview-column">
       <div className="label-preview-heading" ref={previewRef}>
         <div>
           <span className="eyebrow">A4 print preview</span>
-          <h2>{choice === "all" ? "Annual Festival Invitations" : displayDate(selectedDate)}</h2>
+          <h2>{isInvitationChoice ? "Annual Festival Invitations" : choice === "range" ? rangeLabel : displayDate(selectedDate)}</h2>
         </div>
-        <span>3 columns × 5 rows · Print at 100% scale</span>
+        <span>{labelLayout.columns} columns × {labelLayout.rows} rows · {labelsPerPage} labels per A4 · Print at 100% scale</span>
       </div>
 
       {labels.length === 0 ? (
         <section className="panel label-empty-state">
           <Printer size={32} />
-          <strong>No labels to print</strong>
-          <span>
-            {matchingRows.length > 0
-              ? `All labels for this ${choice === "all" ? "invitation list" : "date"} were removed. Restore them to continue.`
-              : choice === "all"
-                ? "There are no devotee or beneficiary addresses available."
-                : "There are no active Shashwatha Poojas scheduled for this date."}
-          </span>
-          {matchingRows.length > 0 && <Button variant="secondary" onClick={restoreLabels}>Restore labels</Button>}
+          <strong>{isPending ? "Loading labels…" : "No labels to print"}</strong>
+          {!isPending && (
+            <span>
+              {matchingRows.length > 0
+                ? `All labels for this ${isInvitationChoice ? "invitation list" : "date"} were removed. Restore them to continue.`
+                : isInvitationChoice
+                  ? "There are no devotee or beneficiary addresses available."
+                  : "There are no active Shashwatha Poojas scheduled for this date."}
+            </span>
+          )}
+          {!isPending && matchingRows.length > 0 && <Button variant="secondary" onClick={restoreLabels}>Restore labels</Button>}
         </section>
       ) : (
         <div className="label-pages">
           {pages.map((page, pageIndex) => (
-            <section className="a4-label-sheet" key={`page-${pageIndex}`} aria-label={`A4 label sheet ${pageIndex + 1}`}>
-              {Array.from({ length: 15 }, (_, slotIndex) => {
+            <section
+              className={`a4-label-sheet ${pageIndex + 1 === visiblePage ? "is-visible" : ""}`}
+              key={`page-${pageIndex}`}
+              aria-label={`A4 label sheet ${pageIndex + 1}`}
+              style={{
+                "--label-columns": labelLayout.columns,
+                "--label-rows": labelLayout.rows,
+                "--label-width-mm": `${labelWidthMm}mm`,
+                "--label-height-mm": `${labelHeightMm}mm`,
+                "--label-width-percent": `${(labelWidthMm / 186) * 100}%`,
+                "--label-height-percent": `${(labelHeightMm / 263) * 100}%`,
+                "--label-name-size": `${nameFontSize}pt`,
+                "--label-address-size": `${addressFontSize}pt`,
+                "--label-phone-size": `${phoneFontSize}pt`,
+                "--label-name-color": nameColor,
+                "--label-address-color": addressColor,
+                "--label-phone-color": phoneColor,
+              } as CSSProperties}
+            >
+              {Array.from({ length: labelsPerPage }, (_, slotIndex) => {
                 const row = page[slotIndex];
                 if (!row) return <div className="courier-label is-empty" key={`blank-${slotIndex}`} aria-hidden="true" />;
                 return (
@@ -278,14 +458,11 @@ export function LabelGenerator({
                       <X size={16} />
                     </button>
                     <strong>{row.name}</strong>
-                    <span className="courier-label-address-heading">Address</span>
                     <address>
-                      <span>{row.addressLine || "Address unavailable"}</span>
-                      {row.addressLine2 && <span>{row.addressLine2}</span>}
                       <span>
-                        {[row.city, row.state].filter(Boolean).join(", ") || "Location unavailable"}
+                        {[row.addressLine, row.addressLine2, row.city, row.state].filter(Boolean).join(", ") || "Address unavailable"}
+                        {row.postalCode && <> — <b>{row.postalCode}</b></>}
                       </span>
-                      {row.postalCode && <span><b>{row.postalCode}</b></span>}
                     </address>
                     <span className="courier-label-phone">{row.phone || "Phone unavailable"}</span>
                   </article>
@@ -294,10 +471,66 @@ export function LabelGenerator({
               <span className="label-sheet-page-number">Page {pageIndex + 1} of {pages.length}</span>
             </section>
           ))}
+          {pages.length > 1 && (
+            <nav className="list-pagination label-preview-pagination" aria-label="Label preview pages">
+              <Button variant="outline" disabled={visiblePage === 1} onClick={() => setPreviewPage(visiblePage - 1)}>
+                <ChevronLeft size={16} /> Previous
+              </Button>
+              <div>
+                {pages.map((_, index) => (
+                  <Button
+                    aria-label={`Show label page ${index + 1}`}
+                    aria-current={visiblePage === index + 1 ? "page" : undefined}
+                    key={index}
+                    variant={visiblePage === index + 1 ? "primary" : "ghost"}
+                    onClick={() => setPreviewPage(index + 1)}
+                  >
+                    {index + 1}
+                  </Button>
+                ))}
+              </div>
+              <Button variant="outline" disabled={visiblePage === pages.length} onClick={() => setPreviewPage(visiblePage + 1)}>
+                Next <ChevronRight size={16} />
+              </Button>
+            </nav>
+          )}
         </div>
       )}
+      </main>
+      </div>
 
-      <footer className="page-footer"><span /> Kambaru Sri Durgaparameshwari Temple <span /></footer>
+      <PageFooter />
     </section>
+  );
+}
+
+function LabelTextControl({
+  label,
+  size,
+  min,
+  max,
+  color,
+  onSize,
+  onColor,
+}: {
+  label: string;
+  size: number;
+  min: number;
+  max: number;
+  color: string;
+  onSize: (value: number) => void;
+  onColor: (value: string) => void;
+}) {
+  return (
+    <div className="label-text-control">
+      <label className="label-dimension-slider">
+        <span><b>{label}</b><output>{size} pt</output></span>
+        <input type="range" min={min} max={max} step="0.5" value={size} onChange={(event) => onSize(Number(event.target.value))} />
+      </label>
+      <label className="label-color-control" title={`${label} color`}>
+        <span>Color</span>
+        <input type="color" value={color} onChange={(event) => onColor(event.target.value)} aria-label={`${label} color`} />
+      </label>
+    </div>
   );
 }

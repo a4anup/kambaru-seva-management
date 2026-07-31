@@ -1,0 +1,153 @@
+// Shapes mirror PLAN.md §10.1 (Devotee / Beneficiary / PoojaEnrollment), flattened
+// for display. Once the backend is wired up (PLAN.md §11, phase 1b), these types
+// move to reflect the Prisma-generated types instead.
+
+export type BeneficiaryRelation =
+  | "son"
+  | "daughter"
+  | "wife"
+  | "husband"
+  | "father"
+  | "mother"
+  | "other";
+
+export type EnrollmentStatus = "active" | "paused" | "cancelled";
+
+export interface Devotee {
+  id: string;
+  devoteeNo: string;
+  fullName: string;
+  dateOfBirth?: string;
+  phonePrimary: string | null;
+  phoneAlternate?: string;
+  email?: string;
+  rashi?: string;
+  nakshatra?: string;
+  gotra?: string;
+  notes?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  addressCity: string;
+  addressDistrict?: string;
+  addressState: string;
+  addressPostalCode: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface Beneficiary {
+  id: string;
+  devoteeId: string;
+  fullName: string;
+  relation: BeneficiaryRelation;
+  phone?: string;
+  rashi?: string;
+  nakshatra?: string;
+  gotra?: string;
+  notes?: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface PoojaEnrollment {
+  id: string;
+  devoteeId: string;
+  forSelf: boolean;
+  beneficiaryId: string | null;
+  annualMonth: number; // 1-12
+  annualDay: number; // 1-31
+  addressMode: "devotee_primary" | "custom";
+  customAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    district?: string;
+    state: string;
+    postalCode: string;
+  };
+  status: EnrollmentStatus;
+  leapDayPolicy: "feb_28" | "mar_1" | "leap_year_only";
+  feeMinor: number;
+  currency: "INR";
+  paymentReference?: string;
+  enrollmentDate: string;
+  createdBy: string;
+  notes?: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+/** A single row on a date's dispatch list — the resolved, display-ready shape. */
+export interface DueRow {
+  enrollmentId: string;
+  beneficiaryName: string;
+  relation: "Self" | Capitalize<BeneficiaryRelation>;
+  sponsorName: string;
+  phone: string | null;
+  addressLine: string;
+  addressSub: string;
+  isCustomAddress: boolean;
+  hasException: boolean;
+  exceptionNote?: string;
+  notes?: string;
+}
+
+export interface DaySummary {
+  date: Date;
+  rows: DueRow[];
+}
+
+/** Display/edit shape for the date-filtered Shashwatha Pooja register. */
+export interface PoojaRegisterRow {
+  enrollmentId: string;
+  sponsorName: string;
+  beneficiaryName: string;
+  relation: "Self" | Capitalize<BeneficiaryRelation>;
+  beneficiaryPhone?: string;
+  beneficiaryRashi?: string;
+  beneficiaryNakshatra?: string;
+  beneficiaryGotra?: string;
+  beneficiaryNotes?: string;
+  phone: string | null;
+  annualMonth: number;
+  annualDay: number;
+  leapDayPolicy: "feb_28" | "mar_1" | "leap_year_only";
+  addressMode: "devotee_primary" | "custom";
+  addressLine: string;
+  addressLine2?: string;
+  addressCity: string;
+  addressDistrict?: string;
+  addressState: string;
+  postalCode: string;
+  status: EnrollmentStatus;
+  feeMinor: number;
+  currency: "INR";
+  paymentReference?: string;
+  enrollmentDate: string;
+  notes?: string;
+  hasException: boolean;
+  exceptionNote?: string;
+}
+
+/** Summary row for the alphabet-filtered devotee directory. */
+export interface DevoteeDirectoryRow {
+  id: string;
+  devoteeNo: string;
+  fullName: string;
+  dateOfBirth?: string;
+  phone: string | null;
+  phoneAlternate?: string;
+  email?: string;
+  rashi?: string;
+  nakshatra?: string;
+  gotra?: string;
+  notes?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  district?: string;
+  state: string;
+  postalCode: string;
+  poojaCount: number;
+  hasException: boolean;
+}

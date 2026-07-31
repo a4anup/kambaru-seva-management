@@ -1,0 +1,20 @@
+{
+  "name": "kambaru-devi-seva",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @kambaru/frontend",
+    "build": "npm run build -w @kambaru/frontend",
+    "start": "npm run start -w @kambaru/frontend",
+    "lint": "npm run lint -w @kambaru/frontend",
+    "fixtures:generate": "node backend/scripts/export-json-fixtures.mjs",
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset",
+    "supabase:push": "supabase db push",
+    "supabase:import-fixtures": "node database/scripts/import-json-to-supabase.mjs"
+  }
+}

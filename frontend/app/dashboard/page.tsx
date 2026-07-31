@@ -58,6 +58,12 @@ export default async function DashboardPage() {
     notes: row.notes,
   }));
 
+  const missingFieldsSummary = [
+    summary.missingPhoneCount > 0 && `${summary.missingPhoneCount} phone ${summary.missingPhoneCount === 1 ? "number" : "numbers"} missing`,
+    summary.missingPincodeCount > 0 && `${summary.missingPincodeCount} PIN ${summary.missingPincodeCount === 1 ? "code" : "codes"} missing`,
+    summary.missingAddressCount > 0 && `${summary.missingAddressCount} ${summary.missingAddressCount === 1 ? "address" : "addresses"} missing`,
+  ].filter((part): part is string => Boolean(part)).join(", ");
+
   const countByDate = new Map(summary.dailyCounts.map((item) => [item.date, item.count]));
   const upcoming: UpcomingPooja[] = Array.from({ length: 5 }, (_, index) => {
     const date = new Date(today);
@@ -112,6 +118,7 @@ export default async function DashboardPage() {
           <TodayPoojaTable
             rows={todayRows}
             dateLabel={dateLabel(today, { day: "2-digit", month: "short", year: "numeric", weekday: "long" })}
+            missingFieldsSummary={missingFieldsSummary}
           />
           <aside className="right-column">
             <UpcomingPoojas items={upcoming} />

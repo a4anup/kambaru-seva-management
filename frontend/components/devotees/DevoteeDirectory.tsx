@@ -1,13 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useState, useTransition } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, MapPin, Pencil, Phone, Plus, Search, TriangleAlert, Users, X } from "lucide-react";
-import type { DevoteeDirectoryPage, DevoteeDirectoryRow } from "@kambaru/backend";
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Eye, MapPin, Pencil, Phone, Plus, Search, TriangleAlert, Users, X } from "lucide-react";
+import type { DevoteeDirectoryPage, DevoteeDirectoryRow, DevoteePoojaDate } from "@kambaru/backend";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
-import { loadDevoteeDirectory, saveDevotee } from "@/app/devotees/actions";
+import { loadDevoteeDirectory, loadDevoteePoojaDates, saveDevotee } from "@/app/devotees/actions";
 import { PageFooter } from "@/components/PageFooter";
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const PAGE_SIZE = 10;
@@ -47,7 +49,17 @@ export function DevoteeDirectory({
   const [selected, setSelected] = useState<DevoteeDirectoryRow>();
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
-  const [, startLoading] = useTransition();
+  const [isLoading, startLoading] = useTransition();
+  const [poojaDatesRow, setPoojaDatesRow] = useState<DevoteeDirectoryRow>();
+  const [poojaDates, setPoojaDates] = useState<DevoteePoojaDate[]>([]);
+  const [datesLoading, setDatesLoading] = useState(false);
+
+  async function showPoojaDates(row: DevoteeDirectoryRow) {
+    setPoojaDatesRow(row);
+    setDatesLoading(true);
+    setPoojaDates(await loadDevoteePoojaDates(row.id));
+    setDatesLoading(false);
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -138,6 +150,7 @@ export function DevoteeDirectory({
           </div>
         </header>
 
+        <div className={`list-loading-wrap ${isLoading ? "is-loading" : ""}`}>
         <div className="devotee-table-head" aria-hidden="true">
           <span>Name</span>
           <span>Devotee ID</span>
@@ -174,12 +187,26 @@ export function DevoteeDirectory({
               </span>
               <span className="pooja-count">
                 <strong>{row.poojaCount}</strong>
+                {row.poojaCount > 0 && (
+                  <button
+                    className="pooja-count-view"
+                    type="button"
+                    onClick={() => showPoojaDates(row)}
+                    aria-label={`View ${row.fullName}'s pooja dates`}
+                  >
+                    <Eye size={15} />
+                  </button>
+                )}
               </span>
               <Button className="devotee-edit-button" variant="outline" onClick={() => setSelected(row)}>
                 <Pencil size={16} /> Edit
               </Button>
             </article>
           ))}
+        </div>
+        <div className={`list-loading-overlay ${isLoading ? "is-active" : ""}`} aria-hidden="true">
+          <span className="list-loading-spinner" />
+        </div>
         </div>
         {total > 0 && (
           <nav className="list-pagination" aria-label="Devotee pages">
@@ -243,7 +270,72 @@ export function DevoteeDirectory({
           }}
         />
       )}
+      {poojaDatesRow && (
+        <PoojaDatesPopup
+          row={poojaDatesRow}
+          dates={poojaDates}
+          loading={datesLoading}
+          onClose={() => setPoojaDatesRow(undefined)}
+        />
+      )}
     </section>
+  );
+}
+
+function PoojaDatesPopup({
+  row,
+  dates,
+  loading,
+  onClose,
+}: {
+  row: DevoteeDirectoryRow;
+  dates: DevoteePoojaDate[];
+  loading: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="pooja-editor-layer">
+      <button className="pooja-editor-backdrop" aria-label="Close pooja dates" onClick={onClose} type="button" />
+      <aside className="pooja-dates-popup" role="dialog" aria-modal="true" aria-labelledby="pooja-dates-title">
+        <header className="pooja-dates-popup-header">
+          <div>
+            <span className="eyebrow">Pooja dates</span>
+            <h2 id="pooja-dates-title">{row.fullName}</h2>
+          </div>
+          <button className="icon-button" aria-label="Close pooja dates" onClick={onClose} type="button"><X size={19} /></button>
+        </header>
+        <div className="pooja-dates-popup-body">
+          {loading ? (
+            <p className="pooja-dates-loading">Loading…</p>
+          ) : dates.length === 0 ? (
+            <p className="pooja-dates-empty">No poojas on file for this devotee.</p>
+          ) : (
+            <ul className="pooja-dates-list">
+              {dates.map((date) => (
+                <li key={date.enrollmentId} className={date.status !== "active" ? "is-inactive" : ""}>
+                  <span className="pooja-dates-date">
+                    <CalendarDays size={15} aria-hidden="true" />
+                    {String(date.annualDay).padStart(2, "0")} {MONTH_LABELS[date.annualMonth - 1]}
+                  </span>
+                  <span className="pooja-dates-who">
+                    {date.relation === "Self" ? "Self" : `${date.beneficiaryName} (${date.relation})`}
+                  </span>
+                  <span className="pooja-dates-status">{date.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }
 

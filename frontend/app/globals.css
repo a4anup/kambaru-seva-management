@@ -232,6 +232,45 @@ a {
   animation: loading-spin 700ms linear infinite;
 }
 
+/* Scoped version of the navigation overlay: dims just the filtered list (not
+   the whole page) while a search/date/letter change is being re-fetched. */
+.list-loading-wrap {
+  position: relative;
+}
+
+.list-loading-wrap.is-loading {
+  min-height: 120px;
+}
+
+.list-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
+  backdrop-filter: blur(1px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.list-loading-overlay.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.list-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-primary-soft);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: loading-spin 700ms linear infinite;
+}
+
 .visually-hidden {
   position: absolute !important;
   width: 1px !important;

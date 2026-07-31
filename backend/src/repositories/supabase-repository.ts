@@ -3,6 +3,7 @@ import type { SaveDevoteeInput, SaveEnrollmentInput } from "../types";
 import type {
   DashboardSummary,
   DevoteeDirectoryPage,
+  DevoteePoojaDate,
   LabelRecipient,
   PageResult,
   PoojaRegisterRow,
@@ -131,7 +132,15 @@ export function createSupabaseTempleRepository(
           const addressLine = custom ? row.custom_address_line1 ?? "" : row.devotee_address_line1;
           const addressCity = custom ? row.custom_address_city ?? "" : row.devotee_address_city;
           const postalCode = custom ? row.custom_address_postal_code ?? "" : row.devotee_address_postal_code;
-          const hasException = !row.phone_primary || !addressLine || !addressCity || !/^\d{6}$/.test(postalCode);
+          const missingPhone = !row.phone_primary;
+          const missingAddress = !addressLine || !addressCity;
+          const missingPincode = !/^\d{6}$/.test(postalCode);
+          const hasException = missingPhone || missingAddress || missingPincode;
+          const missingParts = [
+            missingPhone && "phone number",
+            missingPincode && "PIN code",
+            missingAddress && "address",
+          ].filter((part): part is string => Boolean(part));
           const relation = row.for_self ? "Self" : `${row.beneficiary_relation ?? "other"}`.replace(/^./, (value) => value.toUpperCase()) as PoojaRegisterRow["relation"];
           return {
             enrollmentId: row.id,
@@ -164,7 +173,7 @@ export function createSupabaseTempleRepository(
             enrollmentDate: row.enrollment_date,
             notes: row.notes,
             hasException,
-            exceptionNote: hasException ? "Phone or address information is incomplete" : undefined,
+            exceptionNote: missingParts.length > 0 ? `Missing ${missingParts.join(", ")}` : undefined,
             createdAt: row.created_at,
             modifiedAt: row.modified_at,
           };
@@ -188,6 +197,9 @@ export function createSupabaseTempleRepository(
         activeCount: Number(result.activeCount),
         devoteeCount: Number(result.devoteeCount),
         dailyCounts: result.dailyCounts.map((item) => ({ date: item.date, count: Number(item.count) })),
+        missingPhoneCount: Number(result.missingPhoneCount),
+        missingPincodeCount: Number(result.missingPincodeCount),
+        missingAddressCount: Number(result.missingAddressCount),
       };
     },
     async listBeneficiariesByDevotee(devoteeId) {
@@ -203,6 +215,26 @@ export function createSupabaseTempleRepository(
       });
       if (!response.ok) throw new Error(`Supabase beneficiary query failed (${response.status}).`);
       return ((await response.json()) as BeneficiaryRow[]).map(mapBeneficiary);
+    },
+    async listDevoteePoojaDates(devoteeId): Promise<DevoteePoojaDate[]> {
+      const rows = await callRpc<Array<{
+        enrollment_id: string;
+        pooja_no: string;
+        beneficiary_name: string;
+        relation: DevoteePoojaDate["relation"];
+        annual_month: number;
+        annual_day: number;
+        status: DevoteePoojaDate["status"];
+      }>>(config, "devotee_pooja_dates", { target_devotee_id: devoteeId });
+      return rows.map((row) => ({
+        enrollmentId: row.enrollment_id,
+        poojaNo: row.pooja_no,
+        beneficiaryName: row.beneficiary_name,
+        relation: row.relation,
+        annualMonth: row.annual_month,
+        annualDay: row.annual_day,
+        status: row.status,
+      }));
     },
     async listLabelRecipients({ mode, date, rangeFrom, rangeTo }): Promise<LabelRecipient[]> {
       const rows = await callRpc<Array<{

@@ -105,7 +105,7 @@ export function PoojaRegister({
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
   const [calendarCounts, setCalendarCounts] = useState(initialCalendarCounts);
-  const [, startLoading] = useTransition();
+  const [isLoading, startLoading] = useTransition();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -295,6 +295,7 @@ export function PoojaRegister({
           </div>
         )}
 
+        <div className={`list-loading-wrap ${isLoading ? "is-loading" : ""}`}>
         <div className="pooja-list-head" aria-hidden="true">
           <span>Devotee</span>
           <span>Beneficiary</span>
@@ -349,6 +350,10 @@ export function PoojaRegister({
               );
             })
           )}
+        </div>
+        <div className={`list-loading-overlay ${isLoading ? "is-active" : ""}`} aria-hidden="true">
+          <span className="list-loading-spinner" />
+        </div>
         </div>
         {total > 0 && (
           <nav className="list-pagination" aria-label="Pooja pages">

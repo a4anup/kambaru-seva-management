@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { ChevronRight, FileDown, Printer } from "lucide-react";
+import { ChevronRight, FileDown, Printer, TriangleAlert } from "lucide-react";
 import type { DueRow } from "@kambaru/backend";
+import { Alert } from "@/components/ui/Alert";
 
-export function TodayPoojaTable({ rows, dateLabel, className = "" }: { rows: DueRow[]; dateLabel: string; className?: string }) {
+export function TodayPoojaTable({
+  rows,
+  dateLabel,
+  missingFieldsSummary,
+  className = "",
+}: {
+  rows: DueRow[];
+  dateLabel: string;
+  missingFieldsSummary?: string;
+  className?: string;
+}) {
   return (
     <section className={`panel today-panel ${className}`.trim()}>
       <div className="panel-header">
@@ -15,6 +26,11 @@ export function TodayPoojaTable({ rows, dateLabel, className = "" }: { rows: Due
           <Link className="primary-button" href="/labels"><Printer size={17} /> Generate Labels ({rows.length})</Link>
         </div>
       </div>
+      {missingFieldsSummary && (
+        <Alert icon={TriangleAlert} tone="warning" className="today-panel-warning">
+          {missingFieldsSummary}
+        </Alert>
+      )}
       <div className="table-wrap">
         <table>
           <thead>
@@ -24,8 +40,13 @@ export function TodayPoojaTable({ rows, dateLabel, className = "" }: { rows: Due
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.enrollmentId}>
-                <td><strong>{row.sponsorName}</strong></td>
+              <tr key={row.enrollmentId} className={row.hasException ? "today-row-warning" : ""}>
+                <td>
+                  {row.hasException && (
+                    <TriangleAlert size={16} className="today-row-warning-icon" aria-label={row.exceptionNote ?? "Missing information"} />
+                  )}
+                  <strong>{row.sponsorName}</strong>
+                </td>
                 <td>{row.relation === "Self" ? "Self" : `${row.beneficiaryName} (${row.relation})`}</td>
                 <td className="mono">{row.phone ?? "—"}</td>
                 <td>{[row.addressLine, row.addressSub].filter(Boolean).join(", ") || "—"}</td>

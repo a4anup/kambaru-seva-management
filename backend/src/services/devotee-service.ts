@@ -44,6 +44,9 @@ export function createDevoteeService(templeData: TempleRepository) {
       pageSize: input.pageSize ?? 10,
     });
   },
+  async listPoojaDates(devoteeId: string) {
+    return templeData.listDevoteePoojaDates(devoteeId);
+  },
     async create(input: SaveDevoteeInput): Promise<DevoteeDirectoryRow> {
       return directoryRow(await templeData.createDevotee(input), 0);
     },

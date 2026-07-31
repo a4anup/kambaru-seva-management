@@ -3,6 +3,7 @@ import type {
   DashboardSummary,
   Devotee,
   DevoteeDirectoryPage,
+  DevoteePoojaDate,
   LabelDateMode,
   LabelInvitationScope,
   LabelRecipient,
@@ -27,6 +28,7 @@ export interface TempleRepository {
   getCalendarCounts(year: number, month: number): Promise<Record<number, number>>;
   getDashboardSummary(date: string): Promise<DashboardSummary>;
   listBeneficiariesByDevotee(devoteeId: string): Promise<Beneficiary[]>;
+  listDevoteePoojaDates(devoteeId: string): Promise<DevoteePoojaDate[]>;
   listLabelRecipients(input: { mode: LabelDateMode; date?: string; rangeFrom?: string; rangeTo?: string }): Promise<LabelRecipient[]>;
   listInvitationRecipients(scope: LabelInvitationScope): Promise<LabelRecipient[]>;
   queryReport(input: ReportFilters & { groupBy: ReportGroupBy; page: number; pageSize: number }): Promise<ReportPage>;

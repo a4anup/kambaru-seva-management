@@ -1,6 +1,6 @@
 "use server";
 
-import type { DevoteeDirectoryPage, DevoteeDirectoryRow } from "@kambaru/backend";
+import type { DevoteeDirectoryPage, DevoteeDirectoryRow, DevoteePoojaDate } from "@kambaru/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getBackendServices } from "@/lib/server/backend";
@@ -45,6 +45,11 @@ export async function loadDevoteeDirectory(input: {
 }): Promise<DevoteeDirectoryPage> {
   const { devotees } = await getBackendServices();
   return devotees.listDirectoryPage({ ...input, pageSize: 10 });
+}
+
+export async function loadDevoteePoojaDates(devoteeId: string): Promise<DevoteePoojaDate[]> {
+  const { devotees } = await getBackendServices();
+  return devotees.listPoojaDates(devoteeId);
 }
 
 export async function saveDevotee(input: unknown): Promise<SaveDevoteeResult> {

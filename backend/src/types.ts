@@ -234,6 +234,9 @@ export interface DashboardSummary {
   activeCount: number;
   devoteeCount: number;
   dailyCounts: Array<{ date: string; count: number }>;
+  missingPhoneCount: number;
+  missingPincodeCount: number;
+  missingAddressCount: number;
 }
 
 /** A single deduplicated courier-label recipient (used by both date-based and bulk invitation label modes). */
@@ -305,4 +308,14 @@ export interface ReportPage extends PageResult<ReportRow> {
   incompleteCount: number;
   groups: ReportGroupCount[];
   filterOptions: ReportFilterOptions;
+}
+
+export interface DevoteePoojaDate {
+  enrollmentId: string;
+  poojaNo: string;
+  beneficiaryName: string;
+  relation: "Self" | Capitalize<BeneficiaryRelation>;
+  annualMonth: number;
+  annualDay: number;
+  status: EnrollmentStatus;
 }

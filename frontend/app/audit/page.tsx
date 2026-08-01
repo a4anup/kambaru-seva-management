@@ -1,10 +1,12 @@
-import { PlaceholderScreen } from "@/components/PlaceholderScreen";
+import { AppShell } from "@/components/AppShell";
+import { AuditLog } from "@/components/audit/AuditLog";
+import { getBackendServices } from "@/lib/server/backend";
 
-export default function AuditPage() {
+export default async function AuditPage() {
+  const { audit } = await getBackendServices();
   return (
-    <PlaceholderScreen
-      title="Audit Log"
-      body="Audit events will be loaded from the append-only Supabase audit_events table."
-    />
+    <AppShell title="Audit Log">
+      <AuditLog initialPage={await audit.listPage()} />
+    </AppShell>
   );
 }

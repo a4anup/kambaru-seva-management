@@ -14,6 +14,111 @@
   --shadow: var(--shadow-md);
 }
 
+/* Audit log */
+.audit-total {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-info);
+  background: var(--color-info-soft);
+  border: 1px solid color-mix(in srgb, var(--color-info) 18%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+.audit-total span { display: flex; gap: var(--space-1); }
+.audit-panel { overflow: hidden; }
+.audit-toolbar {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 220px 200px;
+  gap: var(--space-4);
+  align-items: end;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+}
+.audit-toolbar > label:not(.resource-search) {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.audit-toolbar select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+.audit-search { width: 100%; max-width: none; }
+.audit-table-head,
+.audit-row {
+  display: grid;
+  grid-template-columns: minmax(170px, .9fr) minmax(150px, .8fr) minmax(130px, .7fr) minmax(180px, .9fr) minmax(240px, 1.5fr);
+  gap: var(--space-4);
+  align-items: center;
+}
+.audit-table-head {
+  padding: var(--space-3) var(--space-5);
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.audit-list { transition: opacity var(--transition-fast); }
+.audit-list.loading { opacity: .55; }
+.audit-row {
+  min-height: 72px;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-divider);
+}
+.audit-row:last-child { border-bottom: 0; }
+.audit-time,
+.audit-actor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+.audit-actor strong { color: var(--color-text-primary); }
+.audit-action {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  color: var(--color-info);
+  background: var(--color-info-soft);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+}
+.audit-action.action-created,
+.audit-action.action-imported { color: var(--color-success); background: var(--color-success-soft); }
+.audit-action.action-archived { color: var(--color-danger); background: var(--color-danger-soft); }
+.audit-action.action-status_corrected { color: var(--color-warning); background: var(--color-warning-soft); }
+.audit-entity { display: grid; gap: 2px; }
+.audit-entity small { color: var(--color-text-muted); }
+.audit-fields { color: var(--color-text-secondary); overflow-wrap: anywhere; }
+
+@media (max-width: 980px) {
+  .audit-toolbar { grid-template-columns: 1fr 1fr; }
+  .audit-search { grid-column: 1 / -1; }
+  .audit-table-head { display: none; }
+  .audit-row { grid-template-columns: 1fr 1fr; align-items: start; }
+  .audit-fields { grid-column: 1 / -1; }
+}
+
+@media (max-width: 620px) {
+  .audit-total { align-self: flex-start; }
+  .audit-toolbar { grid-template-columns: 1fr; }
+  .audit-search { grid-column: auto; }
+  .audit-row { grid-template-columns: 1fr; gap: var(--space-2); }
+  .audit-fields { grid-column: auto; }
+}
+
 body {
   background: var(--cream);
   color: var(--text);
@@ -3089,6 +3194,18 @@ fieldset.modal-form-section > legend {
   font-size: 0.85rem;
 }
 
+.pooja-editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.pooja-editor-header-actions .ui-button {
+  min-height: 38px;
+  padding-inline: var(--space-3);
+}
+
 .pooja-editor-form {
   min-height: 0;
   padding: var(--space-4) var(--space-5) var(--space-6);
@@ -3665,6 +3782,17 @@ fieldset.modal-form-section > legend {
   .pooja-editor-header,
   .pooja-editor-form {
     padding-inline: var(--space-4);
+  }
+  .pooja-editor-header-actions .ui-button {
+    width: 40px;
+    padding: 0;
+    overflow: hidden;
+    color: transparent;
+    gap: 0;
+  }
+  .pooja-editor-header-actions .ui-button svg {
+    color: var(--color-text-primary);
+    flex-shrink: 0;
   }
   .pooja-editor-grid {
     grid-template-columns: 1fr;

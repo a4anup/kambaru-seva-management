@@ -56,6 +56,7 @@ const enrollment = z.object({
   feeMinor: z.number().int().nonnegative().optional(),
   currency: z.literal("INR").optional(),
   paymentReference: optionalText(200),
+  receiptNumber: optionalText(100),
   enrollmentDate: z.string().date().optional(),
   notes: optionalText(2000),
 }).superRefine((value, context) => {

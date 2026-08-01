@@ -14,6 +14,7 @@ import {
   Search,
   Sparkles,
   TriangleAlert,
+  UserRoundPen,
   X,
 } from "lucide-react";
 import type { Beneficiary, DevoteeDirectoryRow, EnrollmentStatus, PageResult, PoojaRegisterRow } from "@kambaru/backend";
@@ -237,7 +238,7 @@ export function PoojaRegister({
               value={query}
               onChange={(event) => { setQuery(event.target.value); setPage(1); }}
               aria-label="Search filtered poojas"
-              placeholder="Search name or phone…"
+              placeholder="Search name, phone, or receipt number…"
             />
           </label>
 
@@ -339,6 +340,7 @@ export function PoojaRegister({
                   <span className="pooja-list-date">
                     <strong>{recurringDate(row)}</strong>
                     <small className="mono">{row.poojaNo}</small>
+                    {row.receiptNumber && <small className="mono">Receipt: {row.receiptNumber}</small>}
                   </span>
                   <span className="pooja-list-address">
                     {[row.addressCity, row.postalCode].filter(Boolean).join(" — ") || "Address missing"}
@@ -503,9 +505,12 @@ function PoojaEditor({
   const [postalCode, setPostalCode] = useState(row.postalCode);
   const [fee, setFee] = useState(String(row.feeMinor / 100));
   const [paymentReference, setPaymentReference] = useState(row.paymentReference ?? "");
+  const [receiptNumber, setReceiptNumber] = useState(row.receiptNumber ?? "");
   const [enrollmentDate, setEnrollmentDate] = useState(row.enrollmentDate);
   const [notes, setNotes] = useState(row.notes ?? "");
   const [error, setError] = useState<string>();
+  const [editStep, setEditStep] = useState(1);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [isSaving, startSaving] = useTransition();
 
   useEffect(() => {
@@ -522,6 +527,11 @@ function PoojaEditor({
     const parsedDate = new Date(`${date}T00:00:00`);
     if (!trimmedName || Number.isNaN(parsedDate.getTime())) {
       setError("Beneficiary name and annual pooja date are required.");
+      return;
+    }
+    if (!acknowledged) {
+      setError("Please review and confirm the changes before saving.");
+      setEditStep(4);
       return;
     }
     setError(undefined);
@@ -556,6 +566,7 @@ function PoojaEditor({
         feeMinor: Math.round(Number(fee || 0) * 100),
         currency: "INR",
         paymentReference,
+        receiptNumber,
         enrollmentDate,
         notes,
       });
@@ -577,110 +588,139 @@ function PoojaEditor({
             <h2 id="pooja-editor-title">{row.beneficiaryName}</h2>
             <p>Sponsored by {row.sponsorName} · {row.phone ?? "No phone"}</p>
           </div>
-          <button className="icon-button" aria-label="Close pooja details" onClick={onClose} type="button"><X size={21} /></button>
+          <div className="pooja-editor-header-actions">
+            <Link className="ui-button ui-button-outline" href={`/devotees?edit=${encodeURIComponent(row.devoteeId)}`}>
+              <UserRoundPen size={17} /> Edit Devotee Profile
+            </Link>
+            <button className="icon-button" aria-label="Close pooja details" onClick={onClose} type="button"><X size={21} /></button>
+          </div>
         </header>
 
         <form className="pooja-editor-form" onSubmit={submit}>
           {error && <Alert>{error}</Alert>}
-
-          <FormField id="beneficiary-name" label="Beneficiary name">
-            <input className="form-control" id="beneficiary-name" value={beneficiaryName} onChange={(event) => setBeneficiaryName(event.target.value)} />
-          </FormField>
-          <div className="pooja-editor-grid">
-            <FormField id="beneficiary-relation" label="Relation">
-              <select className="form-control" id="beneficiary-relation" value={relation} onChange={(event) => setRelation(event.target.value as PoojaRegisterRow["relation"])}>
-                {["Self", "Son", "Daughter", "Wife", "Husband", "Father", "Mother", "Other"].map((item) => <option key={item}>{item}</option>)}
-              </select>
-            </FormField>
-            <FormField id="beneficiary-phone" label="Beneficiary phone">
-              <input className="form-control" id="beneficiary-phone" inputMode="tel" value={beneficiaryPhone} onChange={(event) => setBeneficiaryPhone(event.target.value)} />
-            </FormField>
-          </div>
-          <FormField id="beneficiary-notes" label="Beneficiary notes">
-            <input className="form-control" id="beneficiary-notes" value={beneficiaryNotes} onChange={(event) => setBeneficiaryNotes(event.target.value)} />
-          </FormField>
-          <div className="pooja-editor-grid">
-            <FormField id="beneficiary-rashi" label="Rashi">
-              <input className="form-control" id="beneficiary-rashi" value={beneficiaryRashi} onChange={(event) => setBeneficiaryRashi(event.target.value)} />
-            </FormField>
-            <FormField id="beneficiary-nakshatra" label="Nakshatra">
-              <input className="form-control" id="beneficiary-nakshatra" value={beneficiaryNakshatra} onChange={(event) => setBeneficiaryNakshatra(event.target.value)} />
-            </FormField>
-          </div>
-          <FormField id="beneficiary-gotra" label="Gotra">
-            <input className="form-control" id="beneficiary-gotra" value={beneficiaryGotra} onChange={(event) => setBeneficiaryGotra(event.target.value)} />
-          </FormField>
-
-          <FormField id="annual-date" label="Annual pooja date" help="The year is ignored; the month and day repeat every year.">
-            <input className="form-control" id="annual-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          </FormField>
-
-          <div className="pooja-editor-grid">
-            <FormField id="enrollment-status" label="Status">
-              <select className="form-control" id="enrollment-status" value={status} onChange={(event) => setStatus(event.target.value as EnrollmentStatus)}>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </FormField>
-            <FormField id="address-mode" label="Dispatch address">
-              <select className="form-control" id="address-mode" value={addressMode} onChange={(event) => setAddressMode(event.target.value as PoojaRegisterRow["addressMode"])}>
-                <option value="devotee_primary">Devotee primary</option>
-                <option value="custom">Custom for this pooja</option>
-              </select>
-            </FormField>
+          <div className="devotee-stepper pooja-edit-stepper" aria-label={`Edit pooja step ${editStep} of 4`}>
+            {["Beneficiary", "Spiritual", "Address", "Review"].map((label, index) => (
+              <button
+                className={editStep === index + 1 ? "active" : editStep > index + 1 ? "complete" : ""}
+                key={label}
+                onClick={() => { setEditStep(index + 1); setError(undefined); }}
+                type="button"
+                aria-current={editStep === index + 1 ? "step" : undefined}
+              >
+                <b>{editStep > index + 1 ? "✓" : index + 1}</b><em>{label}</em>
+              </button>
+            ))}
           </div>
 
-          {addressMode === "custom" && (
-            <fieldset className="pooja-address-fields">
-              <legend>Custom address</legend>
-              <FormField id="address-line" label="Address">
-                <input className="form-control" id="address-line" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} />
-              </FormField>
-              <FormField id="address-line-2" label="Address line 2">
-                <input className="form-control" id="address-line-2" value={addressLine2} onChange={(event) => setAddressLine2(event.target.value)} />
+          {editStep === 1 && (
+            <fieldset className="pooja-address-fields modal-form-section">
+              <legend>Beneficiary and annual date</legend>
+              <FormField id="linked-devotee" label="Devotee" help="The devotee linked to this pooja cannot be changed.">
+                <input className="form-control" id="linked-devotee" value={row.sponsorName} readOnly aria-readonly="true" />
               </FormField>
               <div className="pooja-editor-grid">
-                <FormField id="address-city" label="City">
-                  <input className="form-control" id="address-city" value={addressCity} onChange={(event) => setAddressCity(event.target.value)} />
+                <FormField id="beneficiary-relation" label="Relation">
+                  <select className="form-control" id="beneficiary-relation" value={relation} onChange={(event) => {
+                    const next = event.target.value as PoojaRegisterRow["relation"];
+                    setRelation(next);
+                    if (next === "Self") setBeneficiaryName(row.sponsorName);
+                  }}>
+                    {["Self", "Son", "Daughter", "Wife", "Husband", "Father", "Mother", "Other"].map((item) => <option key={item}>{item}</option>)}
+                  </select>
                 </FormField>
-                <FormField id="address-district" label="District">
-                  <input className="form-control" id="address-district" value={addressDistrict} onChange={(event) => setAddressDistrict(event.target.value)} />
+                <FormField id="beneficiary-name" label="Beneficiary name">
+                  <input className="form-control" id="beneficiary-name" disabled={relation === "Self"} value={relation === "Self" ? row.sponsorName : beneficiaryName} onChange={(event) => setBeneficiaryName(event.target.value)} />
                 </FormField>
               </div>
               <div className="pooja-editor-grid">
-                <FormField id="address-state" label="State">
-                  <input className="form-control" id="address-state" value={addressState} onChange={(event) => setAddressState(event.target.value)} />
+                <FormField id="beneficiary-phone" label="Beneficiary phone">
+                  <input className="form-control" id="beneficiary-phone" inputMode="tel" value={beneficiaryPhone} onChange={(event) => setBeneficiaryPhone(event.target.value)} />
                 </FormField>
-                <FormField id="postal-code" label="PIN code">
-                  <input className="form-control" id="postal-code" inputMode="numeric" maxLength={6} value={postalCode} onChange={(event) => setPostalCode(event.target.value)} />
+                <FormField id="annual-date" label="Pooja date every year" help="Only the month and day repeat.">
+                  <input className="form-control" id="annual-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
                 </FormField>
               </div>
+              <FormField id="beneficiary-notes" label="Beneficiary notes">
+                <input className="form-control" id="beneficiary-notes" value={beneficiaryNotes} onChange={(event) => setBeneficiaryNotes(event.target.value)} />
+              </FormField>
             </fieldset>
           )}
 
-          <fieldset className="pooja-address-fields">
-            <legend>Payment and enrollment</legend>
-            <div className="pooja-editor-grid">
-              <FormField id="pooja-fee" label="Fee (₹)">
-                <input className="form-control" id="pooja-fee" type="number" min="0" value={fee} onChange={(event) => setFee(event.target.value)} />
-              </FormField>
-              <FormField id="enrollment-date" label="Enrollment date">
-                <input className="form-control" id="enrollment-date" type="date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} />
-              </FormField>
-            </div>
-            <FormField id="payment-reference" label="Payment reference">
-              <input className="form-control" id="payment-reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} />
-            </FormField>
-          </fieldset>
+          {editStep === 2 && (
+            <fieldset className="pooja-address-fields modal-form-section">
+              <legend>Spiritual details and pooja remarks</legend>
+              <div className="pooja-editor-grid">
+                <FormField id="beneficiary-rashi" label="Rashi"><input className="form-control" id="beneficiary-rashi" value={beneficiaryRashi} onChange={(event) => setBeneficiaryRashi(event.target.value)} /></FormField>
+                <FormField id="beneficiary-nakshatra" label="Nakshatra"><input className="form-control" id="beneficiary-nakshatra" value={beneficiaryNakshatra} onChange={(event) => setBeneficiaryNakshatra(event.target.value)} /></FormField>
+              </div>
+              <FormField id="beneficiary-gotra" label="Gotra"><input className="form-control" id="beneficiary-gotra" value={beneficiaryGotra} onChange={(event) => setBeneficiaryGotra(event.target.value)} /></FormField>
+              <FormField id="pooja-notes" label="Pooja Remarks"><textarea className="form-control pooja-notes" id="pooja-notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></FormField>
+              <details className="pooja-optional-details">
+                <summary>Enrollment and payment details</summary>
+                <div className="pooja-editor-grid">
+                  <FormField id="enrollment-status" label="Status"><select className="form-control" id="enrollment-status" value={status} onChange={(event) => setStatus(event.target.value as EnrollmentStatus)}><option value="active">Active</option><option value="paused">Paused</option><option value="cancelled">Cancelled</option></select></FormField>
+                  <FormField id="enrollment-date" label="Enrollment date"><input className="form-control" id="enrollment-date" type="date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} /></FormField>
+                  <FormField id="pooja-fee" label="Fee (₹)"><input className="form-control" id="pooja-fee" type="number" min="0" value={fee} onChange={(event) => setFee(event.target.value)} /></FormField>
+                  <FormField id="receipt-number" label="Receipt number"><input className="form-control" id="receipt-number" value={receiptNumber} onChange={(event) => setReceiptNumber(event.target.value)} /></FormField>
+                </div>
+                <FormField id="payment-reference" label="Payment reference"><input className="form-control" id="payment-reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></FormField>
+              </details>
+            </fieldset>
+          )}
 
-          <FormField id="pooja-notes" label="Pooja Remarks">
-            <textarea className="form-control pooja-notes" id="pooja-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-          </FormField>
+          {editStep === 3 && (
+            <fieldset className="pooja-address-fields modal-form-section">
+              <legend>Dispatch address</legend>
+              <FormField id="address-mode" label="Where should prasada be sent?">
+                <select className="form-control" id="address-mode" value={addressMode} onChange={(event) => setAddressMode(event.target.value as PoojaRegisterRow["addressMode"])}>
+                  <option value="devotee_primary">Use devotee primary address</option>
+                  <option value="custom">Use a different address for this pooja</option>
+                </select>
+              </FormField>
+              {addressMode === "devotee_primary" ? (
+                <div className="modal-created-summary"><div><span>Devotee primary address</span><strong>This pooja will follow {row.sponsorName}&apos;s current primary address. The linked devotee cannot be changed while editing a pooja.</strong></div></div>
+              ) : (
+                <div className="pooja-custom-address-editor">
+                  <FormField id="address-line" label="Custom address line 1"><input className="form-control" id="address-line" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></FormField>
+                  <FormField id="address-line-2" label="Address line 2"><input className="form-control" id="address-line-2" value={addressLine2} onChange={(event) => setAddressLine2(event.target.value)} /></FormField>
+                  <div className="pooja-editor-grid">
+                    <FormField id="address-city" label="City"><input className="form-control" id="address-city" value={addressCity} onChange={(event) => setAddressCity(event.target.value)} /></FormField>
+                    <FormField id="address-district" label="District"><input className="form-control" id="address-district" value={addressDistrict} onChange={(event) => setAddressDistrict(event.target.value)} /></FormField>
+                    <FormField id="address-state" label="State"><input className="form-control" id="address-state" value={addressState} onChange={(event) => setAddressState(event.target.value)} /></FormField>
+                    <FormField id="postal-code" label="PIN code"><input className="form-control" id="postal-code" inputMode="numeric" maxLength={6} value={postalCode} onChange={(event) => setPostalCode(event.target.value)} /></FormField>
+                  </div>
+                </div>
+              )}
+            </fieldset>
+          )}
+
+          {editStep === 4 && (
+            <section className="modal-form-section pooja-review-section">
+              <header><span><CheckCircle2 size={17} /></span><div><h3>Review changes</h3><p>Confirm the enrollment and dispatch information</p></div></header>
+              <div className="pooja-review-grid">
+                <div><span>Devotee</span><strong>{row.sponsorName}</strong></div>
+                <div><span>Beneficiary</span><strong>{relation === "Self" ? row.sponsorName : beneficiaryName} · {relation}</strong></div>
+                <div><span>Every year</span><strong>{date}</strong></div>
+                <div><span>Status</span><strong>{status}</strong></div>
+                <div className="wide"><span>Spiritual details</span><strong>{[beneficiaryRashi, beneficiaryNakshatra, beneficiaryGotra].filter(Boolean).join(" · ") || "Not provided"}</strong></div>
+                <div className="wide"><span>Dispatch address</span><strong>{addressMode === "devotee_primary" ? `Devotee primary address · follows ${row.sponsorName}'s profile` : [addressLine, addressLine2, addressCity, addressDistrict, addressState, postalCode].filter(Boolean).join(", ") || "Custom address not provided"}</strong></div>
+                <div className="wide"><span>Pooja remarks</span><strong>{notes || "Not provided"}</strong></div>
+              </div>
+              <label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => { setAcknowledged(event.target.checked); setError(undefined); }} /><span>I reviewed these changes and confirm this Shashwatha Pooja.</span></label>
+            </section>
+          )}
 
           <div className="pooja-editor-actions">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : "Save Changes"}</Button>
+            {editStep === 1 ? <Button variant="outline" onClick={onClose}>Cancel</Button> : <Button variant="outline" onClick={() => { setEditStep((current) => Math.max(1, current - 1)); setError(undefined); }}><ChevronLeft size={16} /> Back</Button>}
+            {editStep < 4 ? (
+              <Button onClick={() => {
+                if (editStep === 1 && (relation !== "Self" && !beneficiaryName.trim())) { setError("Beneficiary name is required."); return; }
+                if (editStep === 1 && !date) { setError("Annual pooja date is required."); return; }
+                setError(undefined); setEditStep((current) => Math.min(4, current + 1));
+              }}>Next <ChevronRight size={16} /></Button>
+            ) : (
+              <Button type="submit" disabled={!acknowledged || isSaving}><CheckCircle2 size={17} /> {isSaving ? "Saving…" : "Save Changes"}</Button>
+            )}
           </div>
         </form>
       </aside>
@@ -747,6 +787,7 @@ function AddPoojaModal({
   const [postalCode, setPostalCode] = useState("");
   const [fee, setFee] = useState("1000");
   const [paymentReference, setPaymentReference] = useState("");
+  const [receiptNumber, setReceiptNumber] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(todayInputValue);
   const [error, setError] = useState<string>();
   const [isSaving, startSaving] = useTransition();
@@ -902,6 +943,7 @@ function AddPoojaModal({
       feeMinor: Math.round(Number(fee || 0) * 100),
       currency: "INR",
       paymentReference,
+      receiptNumber,
       enrollmentDate,
       notes: beneficiaryNotes,
       });
@@ -1292,9 +1334,14 @@ function AddPoojaModal({
                   <input className="form-control" id="new-enrollment-date" type="date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} />
                 </FormField>
               </div>
-              <FormField id="new-payment-reference" label="Payment reference">
-                <input className="form-control" id="new-payment-reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} />
-              </FormField>
+              <div className="pooja-editor-grid">
+                <FormField id="new-payment-reference" label="Payment reference">
+                  <input className="form-control" id="new-payment-reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} />
+                </FormField>
+                <FormField id="new-receipt-number" label="Receipt number">
+                  <input className="form-control" id="new-receipt-number" value={receiptNumber} onChange={(event) => setReceiptNumber(event.target.value)} />
+                </FormField>
+              </div>
             </details>
           </fieldset>
           )}

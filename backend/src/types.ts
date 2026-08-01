@@ -70,6 +70,7 @@ export interface PoojaEnrollment {
   feeMinor: number;
   currency: "INR";
   paymentReference?: string;
+  receiptNumber?: string;
   enrollmentDate: string;
   createdBy: string;
   notes?: string;
@@ -126,6 +127,7 @@ export interface PoojaRegisterRow {
   feeMinor: number;
   currency: "INR";
   paymentReference?: string;
+  receiptNumber?: string;
   enrollmentDate: string;
   notes?: string;
   hasException: boolean;
@@ -212,6 +214,7 @@ export interface SaveEnrollmentInput {
   feeMinor?: number;
   currency?: "INR";
   paymentReference?: string;
+  receiptNumber?: string;
   enrollmentDate?: string;
   notes?: string;
 }
@@ -237,6 +240,18 @@ export interface DashboardSummary {
   missingPhoneCount: number;
   missingPincodeCount: number;
   missingAddressCount: number;
+}
+
+export interface AuditLogRow {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  referenceNo: string;
+  occurredAt: string;
+  changedFields: string[];
 }
 
 /** A single deduplicated courier-label recipient (used by both date-based and bulk invitation label modes). */

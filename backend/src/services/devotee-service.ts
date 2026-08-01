@@ -47,6 +47,9 @@ export function createDevoteeService(templeData: TempleRepository) {
   async listPoojaDates(devoteeId: string) {
     return templeData.listDevoteePoojaDates(devoteeId);
   },
+  async getById(devoteeId: string) {
+    return templeData.getDevoteeById(devoteeId);
+  },
     async create(input: SaveDevoteeInput): Promise<DevoteeDirectoryRow> {
       return directoryRow(await templeData.createDevotee(input), 0);
     },

@@ -1,5 +1,6 @@
 import type {
   Beneficiary,
+  AuditLogRow,
   DashboardSummary,
   Devotee,
   DevoteeDirectoryPage,
@@ -24,9 +25,11 @@ import type {
  */
 export interface TempleRepository {
   listDevoteesPage(input: { search?: string; letter?: string; page: number; pageSize: number }): Promise<DevoteeDirectoryPage>;
+  getDevoteeById(devoteeId: string): Promise<DevoteeDirectoryPage["items"][number] | null>;
   listPoojasPage(input: { mode: PoojaRegisterFilterMode; date: string; search?: string; page: number; pageSize: number }): Promise<PageResult<PoojaRegisterRow>>;
   getCalendarCounts(year: number, month: number): Promise<Record<number, number>>;
   getDashboardSummary(date: string): Promise<DashboardSummary>;
+  listAuditPage(input: { search?: string; entity?: string; action?: string; page: number; pageSize: number }): Promise<PageResult<AuditLogRow>>;
   listBeneficiariesByDevotee(devoteeId: string): Promise<Beneficiary[]>;
   listDevoteePoojaDates(devoteeId: string): Promise<DevoteePoojaDate[]>;
   listLabelRecipients(input: { mode: LabelDateMode; date?: string; rangeFrom?: string; rangeTo?: string }): Promise<LabelRecipient[]>;

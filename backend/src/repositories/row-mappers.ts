@@ -56,6 +56,7 @@ export interface EnrollmentRow {
   fee_minor: number;
   currency: "INR";
   payment_reference?: string;
+  receipt_number?: string;
   enrollment_date: string;
   notes?: string;
   created_by: string | null;
@@ -130,6 +131,7 @@ export function mapEnrollment(row: EnrollmentRow): PoojaEnrollment & { exception
     feeMinor: row.fee_minor,
     currency: row.currency,
     paymentReference: row.payment_reference,
+    receiptNumber: row.receipt_number,
     enrollmentDate: row.enrollment_date,
     createdBy: row.created_by ?? "system",
     notes: row.notes,

@@ -34,9 +34,11 @@ function ageFromDateOfBirth(value: string) {
 
 export function DevoteeDirectory({
   initialPage,
+  initialEditRow,
   className = "",
 }: {
   initialPage: DevoteeDirectoryPage;
+  initialEditRow?: DevoteeDirectoryRow;
   className?: string;
 }) {
   const [rows, setRows] = useState(initialPage.items);
@@ -46,7 +48,7 @@ export function DevoteeDirectory({
   const [letter, setLetter] = useState("ALL");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<DevoteeDirectoryRow>();
+  const [selected, setSelected] = useState<DevoteeDirectoryRow | undefined>(initialEditRow);
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
   const [isLoading, startLoading] = useTransition();

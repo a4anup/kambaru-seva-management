@@ -2,6 +2,7 @@ import type { TempleRepository } from "./contracts";
 import type { SaveDevoteeInput, SaveEnrollmentInput } from "../types";
 import type {
   DashboardSummary,
+  AuditLogRow,
   DevoteeDirectoryPage,
   DevoteePoojaDate,
   LabelRecipient,
@@ -101,6 +102,53 @@ export function createSupabaseTempleRepository(
         letterCounts: Object.fromEntries(Object.entries(result.letterCounts ?? {}).map(([key, value]) => [key, Number(value)])),
       };
     },
+    async getDevoteeById(devoteeId) {
+      const params = new URLSearchParams({ select: "*", id: `eq.${devoteeId}`, limit: "1" });
+      const [devoteeResponse, countResponse] = await Promise.all([
+        fetch(`${config.url}/rest/v1/devotees?${params}`, {
+          headers: { apikey: config.anonKey, Authorization: `Bearer ${config.accessToken}` },
+          cache: "no-store",
+        }),
+        fetch(`${config.url}/rest/v1/pooja_enrollments?select=id&devotee_id=eq.${encodeURIComponent(devoteeId)}&status=eq.active`, {
+          method: "HEAD",
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.accessToken}`,
+            Prefer: "count=exact",
+            Range: "0-0",
+          },
+          cache: "no-store",
+        }),
+      ]);
+      if (!devoteeResponse.ok || !countResponse.ok) throw new Error("Supabase devotee lookup failed.");
+      const row = ((await devoteeResponse.json()) as DevoteeRow[])[0];
+      if (!row) return null;
+      const devotee = mapDevotee(row);
+      const count = Number(countResponse.headers.get("content-range")?.split("/")[1] ?? 0);
+      return {
+        id: devotee.id,
+        devoteeNo: devotee.devoteeNo,
+        fullName: devotee.fullName,
+        dateOfBirth: devotee.dateOfBirth,
+        phone: devotee.phonePrimary,
+        phoneAlternate: devotee.phoneAlternate,
+        email: devotee.email,
+        rashi: devotee.rashi,
+        nakshatra: devotee.nakshatra,
+        gotra: devotee.gotra,
+        notes: devotee.notes,
+        addressLine1: devotee.addressLine1,
+        addressLine2: devotee.addressLine2,
+        city: devotee.addressCity || "City missing",
+        district: devotee.addressDistrict,
+        state: devotee.addressState,
+        postalCode: devotee.addressPostalCode || "PIN missing",
+        poojaCount: count,
+        hasException: !devotee.phonePrimary || !devotee.addressLine1 || !devotee.addressCity || !/^\d{6}$/.test(devotee.addressPostalCode),
+        createdAt: devotee.createdAt,
+        modifiedAt: devotee.modifiedAt,
+      };
+    },
     async listPoojasPage({ mode, date, search, page, pageSize }): Promise<PageResult<PoojaRegisterRow>> {
       type JoinedRow = EnrollmentRow & {
         sponsor_name: string;
@@ -170,6 +218,7 @@ export function createSupabaseTempleRepository(
             feeMinor: row.fee_minor,
             currency: row.currency,
             paymentReference: row.payment_reference,
+            receiptNumber: row.receipt_number,
             enrollmentDate: row.enrollment_date,
             notes: row.notes,
             hasException,
@@ -200,6 +249,42 @@ export function createSupabaseTempleRepository(
         missingPhoneCount: Number(result.missingPhoneCount),
         missingPincodeCount: Number(result.missingPincodeCount),
         missingAddressCount: Number(result.missingAddressCount),
+      };
+    },
+    async listAuditPage({ search, entity, action, page, pageSize }) {
+      const result = await callRpc<{
+        items: Array<{
+          id: string;
+          actor_id: string | null;
+          actor_name: string;
+          action: string;
+          entity_type: string;
+          entity_id: string;
+          reference_no: string;
+          occurred_at: string;
+          changed_fields: string[];
+        }>;
+        total: number;
+      }>(config, "audit_log_page", {
+        search_text: search?.trim() || null,
+        entity_filter: entity?.trim() || null,
+        action_filter: action?.trim() || null,
+        page_size: pageSize,
+        page_offset: Math.max(0, page - 1) * pageSize,
+      });
+      return {
+        items: result.items.map((row): AuditLogRow => ({
+          id: row.id,
+          actorId: row.actor_id,
+          actorName: row.actor_name,
+          action: row.action,
+          entityType: row.entity_type,
+          entityId: row.entity_id,
+          referenceNo: row.reference_no,
+          occurredAt: row.occurred_at,
+          changedFields: row.changed_fields ?? [],
+        })),
+        total: Number(result.total),
       };
     },
     async listBeneficiariesByDevotee(devoteeId) {

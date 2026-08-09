@@ -11,9 +11,8 @@ const donationSchema = z.object({
   phone: optionalText(30), addressLine1: optionalText(250), addressLine2: optionalText(250), city: optionalText(120),
   district: optionalText(120), state: optionalText(120), postalCode: optionalText(12), amountMinor: z.number().int().positive(),
   currency: z.literal("INR"), receiptNumber: optionalText(100), donationDate: z.string().date(), donationTypeId: z.string().uuid(),
-  paymentMethod: z.enum(["Cash", "UPI", "Bank", "Bank Transfer", "Cheque", "Other"]).optional(), paymentReference: optionalText(200),
+  paymentMethod: z.enum(["Cash", "UPI", "Bank", "Cheque", "Other"]).optional(), paymentReference: optionalText(200),
   donationGroupId: z.string().uuid().optional(), linkedDevoteeId: z.string().uuid().optional(), notes: optionalText(2000),
-  allowDuplicate: z.boolean().optional(),
 });
 const groupSchema = z.object({
   id: z.string().uuid().optional(), expectedModifiedAt: z.string().optional(), title: z.string().trim().min(1).max(200),
@@ -70,16 +69,7 @@ export async function saveDonationAction(input: unknown) {
   const parsed = donationSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, message: parsed.error.issues[0]?.message ?? "Check the donation information." };
   try {
-    const services = await getBackendServices();
-    const { allowDuplicate, ...payload } = parsed.data;
-    // Existing imported transactions may legitimately share receipt numbers.
-    // Duplicate confirmation is a create-time safeguard, never an edit blocker.
-    if (!payload.id && !allowDuplicate && payload.receiptNumber) {
-      const matches = await services.donations.list({ search: payload.receiptNumber, page: 1, pageSize: 25 });
-      const duplicate = matches.items.find((item) => item.id !== payload.id && item.receiptNumber?.toLowerCase() === payload.receiptNumber?.toLowerCase());
-      if (duplicate) return { ok: false as const, duplicate: true as const, message: `Receipt ${payload.receiptNumber} already exists for ${duplicate.donorName}. Save this donation anyway?` };
-    }
-    const donation = await services.donations.save(payload);
+    const donation = await (await getBackendServices()).donations.save(parsed.data);
     revalidatePath("/donations"); revalidatePath("/donations/list"); revalidatePath("/donations/360"); revalidatePath("/audit");
     return { ok: true as const, donation };
   } catch (error) {

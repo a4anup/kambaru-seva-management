@@ -360,7 +360,7 @@ export interface Donation {
   donationDate: string;
   donationTypeId: string;
   donationTypeName: string;
-  paymentMethod?: "Cash" | "UPI" | "Bank" | "Bank Transfer" | "Cheque" | "Other";
+  paymentMethod?: "Cash" | "UPI" | "Bank" | "Cheque" | "Other";
   paymentReference?: string;
   donationGroupId?: string;
   donationGroupTitle?: string;
@@ -383,6 +383,7 @@ export interface DonationFilters {
   fromDate?: string;
   toDate?: string;
   donationTypeId?: string;
+  paymentMethod?: Donation["paymentMethod"];
   donationGroupId?: string;
   mappingStatus?: "all" | "mapped" | "unmapped";
   reviewStatus?: "all" | "review_required" | "reviewed";

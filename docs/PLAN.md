@@ -96,6 +96,9 @@ and optional management-defined Donation Groups. A Donation always remains a
 separate financial record, even when the donor name, phone, date, or amount matches
 another record. A Donation Group is not a transaction: it groups zero or more
 Donations, and its total/count/date summary is derived from those Donations.
+Receipt numbers are not unique identifiers and may be repeated across independent
+Donation records without a warning or confirmation step. The only currently active
+Donation Type is `Renovation`; the lookup model remains so staff can add types later.
 
 One Donation belongs to zero or one Donation Group. Mapping, moving, and unmapping
 must never alter financial fields. Donations and groups may optionally link to an

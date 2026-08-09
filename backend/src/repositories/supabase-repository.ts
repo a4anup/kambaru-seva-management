@@ -576,7 +576,7 @@ export function createSupabaseTempleRepository(
     async listDonationsPage(input) {
       const result = await callRpc<{ items: DonationResponse[]; total: number; totalAmountMinor: number; mappedCount: number; unmappedCount: number; reviewRequiredCount: number; reviewedCount: number }>(config, "donation_list_page", {
         search_text: input.search?.trim() || null, donor_initial: input.donorInitial?.trim() || null, from_date: input.fromDate || null, to_date: input.toDate || null,
-        filter_type_id: input.donationTypeId || null, filter_group_id: input.donationGroupId || null,
+        filter_type_id: input.donationTypeId || null, filter_payment_method: input.paymentMethod || null, filter_group_id: input.donationGroupId || null,
         mapping_status: input.mappingStatus || null, filter_review_status: input.reviewStatus || null, minimum_amount: input.minimumAmountMinor ?? null,
         maximum_amount: input.maximumAmountMinor ?? null, sort_by: "name_asc",
         page_size: input.pageSize, page_offset: Math.max(0, input.page - 1) * input.pageSize,

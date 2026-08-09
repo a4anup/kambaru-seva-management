@@ -267,6 +267,11 @@ must be derived from Donation records and must not be independently editable.
 Names and phone numbers are not unique donor identities. Repeated donations from
 the same person are expected and valid. Different members of one family may each
 have independent Donation records and may be grouped under one DonationGroup.
+Receipt numbers are also not unique; multiple independent Donations may use the
+same receipt number and must save without duplicate warnings or confirmation.
+
+The only active Donation Type is currently `Renovation`. Keep the type as lookup
+data so additional types can be activated later without redesigning Donations.
 
 Deleting or archiving a DonationGroup must never delete Donation records; group
 archival unassigns its donations in the same database transaction. DonationGroup

@@ -1,11 +1,12 @@
 import {
   BarChart3,
   CalendarDays,
+  CircleDollarSign,
   ClipboardList,
-  FileDown,
+  ContactRound,
+  HandCoins,
   PlusCircle,
   Printer,
-  Search,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -40,9 +41,10 @@ export default async function DashboardPage() {
   const services = await getBackendServices();
   const today = new Date();
   const todayValue = dateInputValue(today);
-  const [summary, todayPage] = await Promise.all([
+  const [summary, todayPage, donationSummary] = await Promise.all([
     services.enrollments.getDashboardSummary(todayValue),
     services.enrollments.listRegisterPage({ mode: "today", date: todayValue, page: 1, pageSize: 10 }),
+    services.donationGroups.list360({ page: 1, pageSize: 1 }),
   ]);
 
   const todayRows = todayPage.items.map((row) => ({
@@ -88,10 +90,10 @@ export default async function DashboardPage() {
     tone: MetricTone;
   }> = [
     { label: "Today's Poojas", value: summary.todayCount, helper: "Poojas scheduled for today", icon: CalendarDays, tone: "orange" },
-    { label: "This Week Poojas", value: summary.weekCount, helper: "Poojas this week", icon: ClipboardList, tone: "amber" },
     { label: "Active Poojas", value: summary.activeCount, helper: "All active pooja enrollments", icon: Sparkles, tone: "red" },
     { label: "Total Devotees", value: summary.devoteeCount, helper: "Registered devotees", icon: Users, tone: "green" },
-    { label: "Labels Ready", value: summary.todayCount, helper: "Available for today's poojas", icon: Printer, tone: "purple" },
+    { label: "Total Donations", value: donationSummary.totalDonations.toLocaleString("en-IN"), helper: "Recorded donation transactions", icon: HandCoins, tone: "amber" },
+    { label: "Donation Amount", value: new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(donationSummary.totalAmountMinor / 100), helper: "Total recorded contributions", icon: CircleDollarSign, tone: "purple" },
   ];
 
   const actions = [
@@ -100,9 +102,9 @@ export default async function DashboardPage() {
     { label: "Today's Poojas", href: "/poojas", icon: ClipboardList },
     { label: "This Week View", href: "/poojas", icon: CalendarDays },
     { label: "Generate Labels", href: "/labels", icon: Printer },
-    { label: "Export to CSV", href: "/reports", icon: FileDown },
     { label: "Reports", href: "/reports", icon: BarChart3 },
-    { label: "Search Devotee", href: "/devotees", icon: Search },
+    { label: "Donation 360", href: "/donations/360", icon: ContactRound },
+    { label: "Donation List", href: "/donations/list", icon: CircleDollarSign },
   ];
 
   return (
@@ -111,8 +113,16 @@ export default async function DashboardPage() {
         <div className="devotional-ambience" aria-hidden="true">
           {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
         </div>
-        <div className="metric-grid">
-          {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
+        <div className="dashboard-metric-groups">
+          <div className="metric-grid dashboard-temple-metrics">
+            {metrics.slice(0, 3).map((metric) => <MetricCard key={metric.label} {...metric} />)}
+          </div>
+          <section className="dashboard-donation-metrics" aria-labelledby="dashboard-donations-heading">
+            <div className="dashboard-donation-metrics-title"><HandCoins size={17}/><span id="dashboard-donations-heading">Donations</span></div>
+            <div className="metric-grid">
+              {metrics.slice(3).map((metric) => <MetricCard key={metric.label} {...metric} />)}
+            </div>
+          </section>
         </div>
         <QuickActions actions={actions} className="dashboard-quick-actions" />
         <div className="dashboard-grid">

@@ -1,8 +1,8 @@
 # Kambaru Seva Management
 
 Administrative platform for **Shree Durgaparameshwari Temple Kambar** to manage
-devotees, annual **Shashwatha Pooja** enrollments, prasada dispatch, courier
-address labels, reports, and daily temple operations.
+devotees, annual **Shashwatha Pooja** enrollments, donations, prasada dispatch,
+courier address labels, reports, audit history, and daily temple operations.
 
 Today this workflow lives in a paper diary — one page per calendar date, with
 devotee details handwritten underneath. Staff have to find the right page,
@@ -11,6 +11,18 @@ courier labels. This app replaces that process: staff enter devotee and pooja
 information once, and the app reliably surfaces who is due each day and
 produces print-ready courier labels — with no re-entry required in future
 years.
+
+The Donations module records every donation as an independent financial
+transaction. Staff can review donations, organize them into optional Donation
+Groups, and create, assign, move, or unmap groups directly from the Donation List
+or donation form. Donation Group totals are calculated from their transactions;
+grouping never merges or replaces donation records.
+
+Every new donation requires review. Completing review records the authenticated
+staff member, timestamp, optional notes, and an Audit Log event. Changes to donor,
+amount, receipt, donation date/type, or payment details automatically return the
+donation to review-required status. Group assignment is derived from
+`donation_group_id` and does not affect review status.
 
 See [`docs/PLAN.md`](./docs/PLAN.md) for the full product requirements and design,
 [`docs/BACKEND_PLAN.md`](./docs/BACKEND_PLAN.md) for the executable backend
@@ -70,6 +82,25 @@ docs/        PLAN.md (product/architecture) and BACKEND_PLAN.md (delivery plan)
 AGENTS.md    Engineering conventions
 ```
 
+## Application routes
+
+- `/dashboard` — daily temple operations
+- `/devotees` — devotee directory and profiles
+- `/poojas` — Shashwatha Pooja register
+- `/donations/list` — donation transactions, review, filters, and group assignment
+- `/donations/360` — expandable Donation Group summaries and mapped transactions
+- `/labels` — courier and invitation label generation
+- `/reports` — operational reporting
+- `/audit` — staff activity and mutation history
+
+## Database changes
+
+All schema and RPC changes are version-controlled under `supabase/migrations/`.
+Donation tables and review workflow migrations must be applied before using the
+Donations routes. Do not make undocumented production-only schema changes.
+
 ## Status
 
-Early development — see `docs/PLAN.md` for current scope and progress.
+Active development with Supabase-backed devotee, pooja, label, reporting, audit,
+staff-authentication, and Donations workflows. See `docs/PLAN.md` for the current
+scope and product rules.

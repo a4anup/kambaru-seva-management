@@ -255,6 +255,60 @@ Mandatory edge cases include:
 - Migration/import runs must be reviewable, traceable, and recoverable.
 - Maintain a production runbook for failed jobs, user deactivation, restore, and label-printer setup.
 
+## Donations Module
+
+### Core Model
+
+A `Donation` is one financial transaction. A `DonationGroup` is a logical
+management grouping of Donations and is not itself a financial transaction. A
+Donation may belong to zero or one DonationGroup. DonationGroup totals/counts
+must be derived from Donation records and must not be independently editable.
+
+Names and phone numbers are not unique donor identities. Repeated donations from
+the same person are expected and valid. Different members of one family may each
+have independent Donation records and may be grouped under one DonationGroup.
+
+Deleting or archiving a DonationGroup must never delete Donation records; group
+archival unassigns its donations in the same database transaction. DonationGroup
+and Donation may optionally reference the existing Devotee model, but creating a
+Devotee is never required to record a Donation.
+
+User-facing Delete actions for Donations and Donation Groups are recoverable
+archive transitions, never physical row deletion. Deleting a Donation hides it
+from operational reads while retaining its financial record and audit history.
+Deleting a Donation Group atomically unmaps every active linked Donation, audits
+each unmap, and then archives the group; Donation review state is unchanged.
+
+All Donation mutations, mappings, moves, and unmapping operations must be included
+in the application's Audit Log. The Donations UI must use the existing temple
+design system and shared components; no Donations-specific theme is allowed.
+
+Every Donation independently has review status `review_required` or `reviewed`.
+Review records the authenticated staff user, timestamp, optional notes, and an
+audit event. Editing donor name, amount, receipt number, donation date/type, or
+payment method/reference resets the review at the database layer. Group mapping is
+organizational metadata and never resets review. Assignment is derived only from
+nullable `donation_group_id`; do not add a parallel assignment boolean.
+
+Donation Group assignment is available directly from Donation List row actions
+and the donation add/detail form. Staff must be able to select an existing group,
+move to another group, unmap, or create a full Donation Group and immediately
+link it without navigating to the 360 view or reloading the page. The reusable
+create-and-link form includes group title plus optional phones, address, linked
+devotee, and notes. Creating and linking produces distinct group-create and
+donation-map Audit Log events.
+
+Canonical routes:
+
+- Donation 360 view: `/donations/360`
+- Donation list: `/donations/list`
+
+Donation 360 uses an expandable table. Selecting a group row reveals group
+details and linked Donation transactions inline; ordinary group review and
+unmapping must not require navigation to a separate detail route.
+
+Review this section before changing Donation behavior.
+
 ## Pull request checklist
 
 - Requirement/issue linked

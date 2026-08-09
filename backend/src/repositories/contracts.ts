@@ -17,6 +17,15 @@ import type {
   ReportPage,
   SaveDevoteeInput,
   SaveEnrollmentInput,
+  Donation,
+  DonationFilters,
+  DonationGroup,
+  DonationGroupDetail,
+  DonationGroupPage,
+  DonationPage,
+  DonationType,
+  SaveDonationGroupInput,
+  SaveDonationInput,
 } from "../types";
 
 /**
@@ -40,4 +49,17 @@ export interface TempleRepository {
   updateDevotee(input: SaveDevoteeInput & { id: string; expectedModifiedAt: string }): Promise<Devotee>;
   createEnrollment(input: SaveEnrollmentInput): Promise<PoojaEnrollment>;
   updateEnrollment(input: SaveEnrollmentInput & { id: string; expectedModifiedAt: string }): Promise<PoojaEnrollment>;
+  listDonationTypes(): Promise<DonationType[]>;
+  listDonationsPage(input: DonationFilters & { page: number; pageSize: number }): Promise<DonationPage>;
+  listDonationGroupsPage(input: { search?: string; sortBy?: string; page: number; pageSize: number }): Promise<DonationGroupPage>;
+  getDonationGroupDetail(groupId: string): Promise<DonationGroupDetail | null>;
+  listUnassignedDonations(search?: string): Promise<Donation[]>;
+  saveDonation(input: SaveDonationInput): Promise<Donation>;
+  markDonationReviewed(donationId: string, reviewNotes?: string): Promise<Donation>;
+  returnDonationToReview(donationId: string): Promise<Donation>;
+  archiveDonation(donationId: string): Promise<boolean>;
+  saveDonationGroup(input: SaveDonationGroupInput): Promise<DonationGroup>;
+  mapDonations(groupId: string, donationIds: string[]): Promise<number>;
+  unmapDonation(donationId: string): Promise<boolean>;
+  archiveDonationGroup(groupId: string): Promise<boolean>;
 }

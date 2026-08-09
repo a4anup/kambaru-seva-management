@@ -89,6 +89,30 @@ produces print-ready courier labels, with no re-entry required in future years.
 - Additional seva types / non-annual recurrence rules.
 - Multi-temple support.
 
+### Donations management enhancement
+
+The authenticated staff application also manages individual donation transactions
+and optional management-defined Donation Groups. A Donation always remains a
+separate financial record, even when the donor name, phone, date, or amount matches
+another record. A Donation Group is not a transaction: it groups zero or more
+Donations, and its total/count/date summary is derived from those Donations.
+
+One Donation belongs to zero or one Donation Group. Mapping, moving, and unmapping
+must never alter financial fields. Donations and groups may optionally link to an
+existing Devotee, without requiring or synchronizing a Devotee record. Archiving a
+group atomically unassigns its Donations and never deletes them. All mutations are
+audited. Canonical staff routes are `/donations/360` and `/donations/list`.
+
+Donation and Donation Group “Delete” controls perform recoverable archives. A
+group archive atomically unmaps its Donations and preserves their financial and
+review records; each automatic unmap and archive is audited.
+
+Every Donation starts with `review_required`. Authorized staff can mark it
+`reviewed`, recording `reviewed_at`, `reviewed_by`, optional review notes, and an
+audit event. Material financial/source edits automatically reset review; Donation
+Group mapping and unmapping do not. Assignment status is derived exclusively from
+the nullable `donation_group_id` foreign key.
+
 ### Explicitly not in MVP
 Public registration, online payment processing, full temple accounting, courier
 provider integration, biometric/government-ID storage.

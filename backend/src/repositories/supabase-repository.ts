@@ -1,5 +1,5 @@
 import type { TempleRepository } from "./contracts";
-import type { SaveDevoteeInput, SaveEnrollmentInput } from "../types";
+import type { Donation, DonationGroup, SaveDevoteeInput, SaveEnrollmentInput } from "../types";
 import type {
   DashboardSummary,
   AuditLogRow,
@@ -45,9 +45,60 @@ async function callRpc<T>(
     if (response.status === 409 || details.includes("STALE_RECORD")) {
       throw new Error("CONFLICT");
     }
+    if (details.includes("DUPLICATE_GROUP")) {
+      throw new Error("DUPLICATE_GROUP");
+    }
     throw new Error(`Supabase mutation failed (${response.status}).`);
   }
   return response.json() as Promise<T>;
+}
+
+type DonationResponse = {
+  id: string; donor_name?: string; phone?: string; address_line1?: string; address_line2?: string;
+  city?: string; district?: string; state?: string; postal_code?: string; amount_minor: number;
+  currency: "INR"; receipt_number?: string; donation_date: string; donation_type_id: string;
+  donation_type_name: string; payment_method?: Donation["paymentMethod"]; payment_reference?: string;
+  donation_group_id?: string; donation_group_title?: string; linked_devotee_id?: string;
+  linked_devotee_name?: string; linked_devotee_no?: string; notes?: string;
+  review_status: Donation["reviewStatus"]; reviewed_at?: string; reviewed_by?: string;
+  reviewed_by_name?: string; review_notes?: string;
+  created_at: string; modified_at: string;
+};
+
+type DonationGroupResponse = {
+  group_id: string; title: string; phone?: string; alternate_phone?: string; address_line1?: string;
+  address_line2?: string; city?: string; district?: string; state?: string; postal_code?: string;
+  linked_devotee_id?: string; linked_devotee_name?: string; notes?: string; total_amount_minor: number;
+  donation_count: number; first_donation_date?: string; latest_donation_date?: string;
+  created_at: string; modified_at: string;
+};
+
+function mapDonation(row: DonationResponse): Donation {
+  return {
+    id: row.id, donorName: row.donor_name, phone: row.phone, addressLine1: row.address_line1,
+    addressLine2: row.address_line2, city: row.city, district: row.district, state: row.state,
+    postalCode: row.postal_code, amountMinor: Number(row.amount_minor), currency: row.currency,
+    receiptNumber: row.receipt_number, donationDate: row.donation_date, donationTypeId: row.donation_type_id,
+    donationTypeName: row.donation_type_name, paymentMethod: row.payment_method,
+    paymentReference: row.payment_reference, donationGroupId: row.donation_group_id,
+    donationGroupTitle: row.donation_group_title, linkedDevoteeId: row.linked_devotee_id,
+    linkedDevoteeName: row.linked_devotee_name, linkedDevoteeNo: row.linked_devotee_no,
+    notes: row.notes, reviewStatus: row.review_status, reviewedAt: row.reviewed_at,
+    reviewedBy: row.reviewed_by, reviewedByName: row.reviewed_by_name, reviewNotes: row.review_notes,
+    createdAt: row.created_at, modifiedAt: row.modified_at,
+  };
+}
+
+function mapDonationGroup(row: DonationGroupResponse): DonationGroup {
+  return {
+    id: row.group_id, title: row.title, phone: row.phone, alternatePhone: row.alternate_phone,
+    addressLine1: row.address_line1, addressLine2: row.address_line2, city: row.city,
+    district: row.district, state: row.state, postalCode: row.postal_code,
+    linkedDevoteeId: row.linked_devotee_id, linkedDevoteeName: row.linked_devotee_name,
+    notes: row.notes, totalAmountMinor: Number(row.total_amount_minor), donationCount: Number(row.donation_count),
+    firstDonationDate: row.first_donation_date, latestDonationDate: row.latest_donation_date,
+    createdAt: row.created_at, modifiedAt: row.modified_at,
+  };
 }
 
 export function createSupabaseTempleRepository(
@@ -517,6 +568,67 @@ export function createSupabaseTempleRepository(
         input_payload: input,
       });
       return mapEnrollment(row);
+    },
+    async listDonationTypes() {
+      const rows = await callRpc<Array<{ id: string; name: string; description?: string; active: boolean; display_order: number }>>(config, "donation_types_active", {});
+      return rows.map((row) => ({ id: row.id, name: row.name, description: row.description, active: row.active, displayOrder: row.display_order }));
+    },
+    async listDonationsPage(input) {
+      const result = await callRpc<{ items: DonationResponse[]; total: number; totalAmountMinor: number; mappedCount: number; unmappedCount: number; reviewRequiredCount: number; reviewedCount: number }>(config, "donation_list_page", {
+        search_text: input.search?.trim() || null, donor_initial: input.donorInitial?.trim() || null, from_date: input.fromDate || null, to_date: input.toDate || null,
+        filter_type_id: input.donationTypeId || null, filter_group_id: input.donationGroupId || null,
+        mapping_status: input.mappingStatus || null, filter_review_status: input.reviewStatus || null, minimum_amount: input.minimumAmountMinor ?? null,
+        maximum_amount: input.maximumAmountMinor ?? null, sort_by: "name_asc",
+        page_size: input.pageSize, page_offset: Math.max(0, input.page - 1) * input.pageSize,
+      });
+      return { items: result.items.map(mapDonation), total: Number(result.total), totalAmountMinor: Number(result.totalAmountMinor), mappedCount: Number(result.mappedCount), unmappedCount: Number(result.unmappedCount), reviewRequiredCount: Number(result.reviewRequiredCount), reviewedCount: Number(result.reviewedCount) };
+    },
+    async listDonationGroupsPage(input) {
+      const result = await callRpc<{ items: DonationGroupResponse[]; totalGroups: number; totalDonations: number; totalAmountMinor: number; unmappedDonations: number }>(config, "donation_groups_page", {
+        search_text: input.search?.trim() || null, sort_by: input.sortBy || "latest", page_size: input.pageSize,
+        page_offset: Math.max(0, input.page - 1) * input.pageSize,
+      });
+      return { items: result.items.map(mapDonationGroup), totalGroups: Number(result.totalGroups), totalDonations: Number(result.totalDonations), totalAmountMinor: Number(result.totalAmountMinor), unmappedDonations: Number(result.unmappedDonations) };
+    },
+    async getDonationGroupDetail(groupId) {
+      const result = await callRpc<{ group: DonationGroupResponse; donations: DonationResponse[] } | null>(config, "donation_group_detail", { target_group_id: groupId });
+      return result ? { group: mapDonationGroup(result.group), donations: result.donations.map(mapDonation) } : null;
+    },
+    async listUnassignedDonations(search) {
+      const rows = await callRpc<DonationResponse[]>(config, "unassigned_donations", { search_text: search?.trim() || null, page_size: 50 });
+      return rows.map(mapDonation);
+    },
+    async saveDonation(input) {
+      const saved = await callRpc<{ id: string }>(config, "save_donation", { input_payload: input });
+      const row = await callRpc<DonationResponse>(config, "donation_by_id", { target_donation_id: saved.id });
+      return mapDonation(row);
+    },
+    async markDonationReviewed(donationId, reviewNotes) {
+      await callRpc<DonationResponse>(config, "mark_donation_reviewed", { target_donation_id: donationId, review_notes_input: reviewNotes || null });
+      const row = await callRpc<DonationResponse>(config, "donation_by_id", { target_donation_id: donationId });
+      return mapDonation(row);
+    },
+    async returnDonationToReview(donationId) {
+      await callRpc<DonationResponse>(config, "return_donation_to_review", { target_donation_id: donationId });
+      const row = await callRpc<DonationResponse>(config, "donation_by_id", { target_donation_id: donationId });
+      return mapDonation(row);
+    },
+    async archiveDonation(donationId) {
+      return Boolean(await callRpc<boolean>(config, "archive_donation", { target_donation_id: donationId }));
+    },
+    async saveDonationGroup(input) {
+      const saved = await callRpc<{ id: string }>(config, "save_donation_group", { input_payload: input });
+      const detail = await callRpc<{ group: DonationGroupResponse; donations: DonationResponse[] }>(config, "donation_group_detail", { target_group_id: saved.id });
+      return mapDonationGroup(detail.group);
+    },
+    async mapDonations(groupId, donationIds) {
+      return Number(await callRpc<number>(config, "map_donations", { target_group_id: groupId, donation_ids: donationIds }));
+    },
+    async unmapDonation(donationId) {
+      return Boolean(await callRpc<boolean>(config, "unmap_donation", { target_donation_id: donationId }));
+    },
+    async archiveDonationGroup(groupId) {
+      return Boolean(await callRpc<boolean>(config, "archive_donation_group", { target_group_id: groupId }));
     },
   };
 }

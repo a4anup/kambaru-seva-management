@@ -15,6 +15,8 @@ const entityLabels: Record<string, string> = {
   pooja_enrollment: "Shashwatha Pooja",
   beneficiary: "Beneficiary",
   occurrence: "Pooja occurrence",
+  donation: "Donation",
+  donation_group: "Donation Group",
 };
 
 const actionLabels: Record<string, string> = {
@@ -23,6 +25,11 @@ const actionLabels: Record<string, string> = {
   imported: "Imported",
   archived: "Archived",
   status_corrected: "Status corrected",
+  mapped: "Mapped",
+  moved: "Moved",
+  unmapped: "Unmapped",
+  reviewed: "Reviewed",
+  review_required: "Review required",
 };
 
 const fieldLabels: Record<string, string> = {
@@ -40,6 +47,10 @@ const fieldLabels: Record<string, string> = {
   address_mode: "address choice",
   status: "status",
   notes: "notes",
+  review_status: "review status",
+  review_notes: "review notes",
+  reviewed_at: "reviewed at",
+  reviewed_by: "reviewed by",
 };
 
 function readable(value: string, dictionary: Record<string, string>) {

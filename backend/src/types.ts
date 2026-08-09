@@ -335,3 +335,111 @@ export interface DevoteePoojaDate {
   annualDay: number;
   status: EnrollmentStatus;
 }
+
+export interface DonationType {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  displayOrder: number;
+}
+
+export interface Donation {
+  id: string;
+  donorName?: string;
+  phone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  postalCode?: string;
+  amountMinor: number;
+  currency: "INR";
+  receiptNumber?: string;
+  donationDate: string;
+  donationTypeId: string;
+  donationTypeName: string;
+  paymentMethod?: "Cash" | "UPI" | "Bank" | "Bank Transfer" | "Cheque" | "Other";
+  paymentReference?: string;
+  donationGroupId?: string;
+  donationGroupTitle?: string;
+  linkedDevoteeId?: string;
+  linkedDevoteeName?: string;
+  linkedDevoteeNo?: string;
+  notes?: string;
+  reviewStatus: "review_required" | "reviewed";
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewNotes?: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface DonationFilters {
+  search?: string;
+  donorInitial?: string;
+  fromDate?: string;
+  toDate?: string;
+  donationTypeId?: string;
+  donationGroupId?: string;
+  mappingStatus?: "all" | "mapped" | "unmapped";
+  reviewStatus?: "all" | "review_required" | "reviewed";
+  minimumAmountMinor?: number;
+  maximumAmountMinor?: number;
+  sortBy?: "name_asc";
+}
+
+export interface DonationPage extends PageResult<Donation> {
+  totalAmountMinor: number;
+  mappedCount: number;
+  unmappedCount: number;
+  reviewRequiredCount: number;
+  reviewedCount: number;
+}
+
+export interface DonationGroup {
+  id: string;
+  title: string;
+  phone?: string;
+  alternatePhone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  postalCode?: string;
+  linkedDevoteeId?: string;
+  linkedDevoteeName?: string;
+  notes?: string;
+  totalAmountMinor: number;
+  donationCount: number;
+  firstDonationDate?: string;
+  latestDonationDate?: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface DonationGroupPage {
+  items: DonationGroup[];
+  totalGroups: number;
+  totalDonations: number;
+  totalAmountMinor: number;
+  unmappedDonations: number;
+}
+
+export interface DonationGroupDetail {
+  group: DonationGroup;
+  donations: Donation[];
+}
+
+export type SaveDonationInput = Omit<Donation, "id" | "donationTypeName" | "donationGroupTitle" | "linkedDevoteeName" | "linkedDevoteeNo" | "reviewStatus" | "reviewedAt" | "reviewedBy" | "reviewedByName" | "reviewNotes" | "createdAt" | "modifiedAt"> & {
+  id?: string;
+  expectedModifiedAt?: string;
+};
+
+export type SaveDonationGroupInput = Omit<DonationGroup, "id" | "linkedDevoteeName" | "totalAmountMinor" | "donationCount" | "firstDonationDate" | "latestDonationDate" | "createdAt" | "modifiedAt"> & {
+  id?: string;
+  expectedModifiedAt?: string;
+};

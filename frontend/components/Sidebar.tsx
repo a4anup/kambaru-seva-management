@@ -7,7 +7,10 @@ import logo from "@/assets/logo.png";
 import { signOut } from "@/app/login/actions";
 import {
   BarChart3,
+  CircleDollarSign,
+  ContactRound,
   Home,
+  HandCoins,
   LogOut,
   Printer,
   Settings,
@@ -20,6 +23,10 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/devotees", label: "Devotees", icon: Users },
   { href: "/poojas", label: "Poojas", icon: Sparkles },
+  { href: "/donations", label: "Donations", icon: HandCoins, children: [
+    { href: "/donations/360", label: "360 View", icon: ContactRound },
+    { href: "/donations/list", label: "Donation List", icon: CircleDollarSign },
+  ] },
   { href: "/labels", label: "Generate Labels", icon: Printer },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/audit", label: "Audit Log", icon: ShieldCheck },
@@ -58,13 +65,16 @@ export function Sidebar({
       </div>
 
       <nav className="nav-list" aria-label="Main navigation">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon, children }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
           return (
-            <Link key={href} href={href} className={`nav-item ${active ? "active" : ""}`} onClick={onClose}>
-              <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-              <span>{label}</span>
-            </Link>
+            <div className={`nav-group ${active ? "active" : ""}`} key={href}>
+              <Link href={children?.[0]?.href ?? href} className={`nav-item ${active ? "active" : ""}`} onClick={onClose}>
+                <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
+              {children && active && <div className="nav-children">{children.map((child) => { const ChildIcon=child.icon; return <Link key={child.href} href={child.href} className={pathname === child.href || pathname.startsWith(`${child.href}/`) ? "active" : ""} onClick={onClose}><ChildIcon size={15} aria-hidden="true"/><span>{child.label}</span></Link>})}</div>}
+            </div>
           );
         })}
       </nav>

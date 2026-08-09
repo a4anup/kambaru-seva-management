@@ -72,7 +72,9 @@ export async function saveDonationAction(input: unknown) {
   try {
     const services = await getBackendServices();
     const { allowDuplicate, ...payload } = parsed.data;
-    if (!allowDuplicate && payload.receiptNumber) {
+    // Existing imported transactions may legitimately share receipt numbers.
+    // Duplicate confirmation is a create-time safeguard, never an edit blocker.
+    if (!payload.id && !allowDuplicate && payload.receiptNumber) {
       const matches = await services.donations.list({ search: payload.receiptNumber, page: 1, pageSize: 25 });
       const duplicate = matches.items.find((item) => item.id !== payload.id && item.receiptNumber?.toLowerCase() === payload.receiptNumber?.toLowerCase());
       if (duplicate) return { ok: false as const, duplicate: true as const, message: `Receipt ${payload.receiptNumber} already exists for ${duplicate.donorName}. Save this donation anyway?` };

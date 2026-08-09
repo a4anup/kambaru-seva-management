@@ -18,7 +18,7 @@ type FieldErrors = {
   password?: string;
 };
 
-const applicationName = "Shashwatha Pooja";
+const applicationName = "Kambaru Seva";
 const applicationSubtitle = "Management Application";
 
 export function LoginForm({ className = "" }: { className?: string }) {

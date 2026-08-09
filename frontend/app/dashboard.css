@@ -1636,6 +1636,20 @@ input {
   gap: var(--space-2);
 }
 
+.pooja-list-primary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pooja-list-primary small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pooja-list-beneficiary {
   display: flex;
   align-items: baseline;
@@ -3220,6 +3234,84 @@ fieldset.modal-form-section > legend {
   gap: var(--space-3);
 }
 
+.linked-devotee-field {
+  min-width: 0;
+}
+
+.linked-devotee-control-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.linked-devotee-control-row .ui-button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.linked-devotee-readonly,
+.linked-devotee-readonly:focus {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.annual-date-field,
+.annual-date-select {
+  min-width: 0;
+}
+
+.annual-date-select {
+  align-items: end;
+  grid-template-columns: minmax(0, 1.35fr) minmax(88px, 0.65fr);
+}
+
+.devotee-primary-address-summary address {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--color-success) 20%, var(--color-border));
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  font-style: normal;
+}
+
+.devotee-primary-address-summary address strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.devotee-primary-address-summary small {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.pooja-review-address address {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.pooja-review-address address strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.pooja-review-address small {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
 .pooja-address-fields {
   margin: 0;
   padding: var(--space-4);
@@ -3770,6 +3862,12 @@ fieldset.modal-form-section > legend {
     justify-self: start;
   }
   .pooja-editor {
+    width: 100%;
+  }
+  .linked-devotee-control-row {
+    grid-template-columns: 1fr;
+  }
+  .linked-devotee-control-row .ui-button {
     width: 100%;
   }
   .pooja-editor-modal {

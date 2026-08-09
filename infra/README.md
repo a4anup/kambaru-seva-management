@@ -13,6 +13,16 @@ later — nothing here should be built ahead of the need it serves.
 - **Database + Auth**: Supabase (free tier) — see `PLAN.md` §9.4 for the explicit
   backup/pause tradeoff of staying on the free tier.
 
+## Node.js runtime
+
+- Development, CI, and Vercel must use **Node.js 22 LTS**. The root and frontend
+  `.nvmrc` files plus package `engines` declarations are the version source of
+  truth.
+- With `nvm`, run `nvm install 22 && nvm use 22` before installing dependencies.
+- Set the Vercel project Node.js version to 22 if it does not automatically honor
+  the frontend package engine. Reinstall dependencies and rebuild after changing
+  runtime versions.
+
 ## CI
 
 GitHub Actions workflows must live at the repo root (`.github/workflows/`, a

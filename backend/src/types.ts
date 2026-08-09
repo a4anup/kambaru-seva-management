@@ -103,6 +103,7 @@ export interface PoojaRegisterRow {
   enrollmentId: string;
   poojaNo: string;
   devoteeId: string;
+  devoteeNo: string;
   beneficiaryId: string | null;
   sponsorName: string;
   beneficiaryName: string;

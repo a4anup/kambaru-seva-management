@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { loadDevoteeDirectory, loadDevoteePoojaDates, saveDevotee } from "@/app/devotees/actions";
 import { PageFooter } from "@/components/PageFooter";
-
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+import { formatAnnualDisplayDate, formatDisplayDate } from "@/lib/date-format";
+import { FormattedDateInput } from "@/components/ui/FormattedDateInput";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const PAGE_SIZE = 10;
@@ -325,7 +325,7 @@ function PoojaDatesPopup({
                 <li key={date.enrollmentId} className={date.status !== "active" ? "is-inactive" : ""}>
                   <span className="pooja-dates-date">
                     <CalendarDays size={15} aria-hidden="true" />
-                    {String(date.annualDay).padStart(2, "0")} {MONTH_LABELS[date.annualMonth - 1]}
+                    {formatAnnualDisplayDate(date.annualMonth, date.annualDay)}
                   </span>
                   <span className="pooja-dates-who">
                     {date.relation === "Self" ? "Self" : `${date.beneficiaryName} (${date.relation})`}
@@ -341,7 +341,7 @@ function PoojaDatesPopup({
   );
 }
 
-function DevoteeEditor({
+export function DevoteeEditor({
   row,
   isNew = false,
   onClose,
@@ -468,7 +468,7 @@ function DevoteeEditor({
             </FormField>
             <div className="dob-age-grid">
               <FormField id="devotee-dob" label="Date of birth">
-                <input className="form-control" id="devotee-dob" type="date" max={todayInputForDevotee()} value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
+                <FormattedDateInput className="form-control" id="devotee-dob" max={todayInputForDevotee()} value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
               </FormField>
               <div className="calculated-age" aria-live="polite">
                 <span>Current age</span>
@@ -548,7 +548,7 @@ function DevoteeEditor({
               <div className="devotee-review-grid">
                 <div className="review-row review-row-two">
                   <div><span>Name</span><strong>{name || "Not provided"}</strong></div>
-                  <div><span>Date of birth / Age</span><strong>{dateOfBirth ? `${dateOfBirth} · ${ageFromDateOfBirth(dateOfBirth) ?? "—"} years` : "Not provided"}</strong></div>
+                  <div><span>Date of birth / Age</span><strong>{dateOfBirth ? `${formatDisplayDate(dateOfBirth)} · ${ageFromDateOfBirth(dateOfBirth) ?? "—"} years` : "Not provided"}</strong></div>
                 </div>
                 <div className="review-row review-row-two">
                   <div><span>Primary phone</span><strong>{phone || "Not provided"}</strong></div>

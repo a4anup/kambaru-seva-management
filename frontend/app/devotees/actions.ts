@@ -52,6 +52,11 @@ export async function loadDevoteePoojaDates(devoteeId: string): Promise<DevoteeP
   return devotees.listPoojaDates(devoteeId);
 }
 
+export async function loadDevoteeProfile(devoteeId: string): Promise<DevoteeDirectoryRow | null> {
+  const { devotees } = await getBackendServices();
+  return devotees.getById(devoteeId);
+}
+
 export async function saveDevotee(input: unknown): Promise<SaveDevoteeResult> {
   const parsed = devoteeInput.safeParse(input);
   if (!parsed.success) {

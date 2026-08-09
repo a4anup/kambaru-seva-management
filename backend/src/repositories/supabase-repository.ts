@@ -151,6 +151,7 @@ export function createSupabaseTempleRepository(
     },
     async listPoojasPage({ mode, date, search, page, pageSize }): Promise<PageResult<PoojaRegisterRow>> {
       type JoinedRow = EnrollmentRow & {
+        devotee_no: string;
         sponsor_name: string;
         phone_primary: string | null;
         beneficiary_name?: string;
@@ -194,6 +195,7 @@ export function createSupabaseTempleRepository(
             enrollmentId: row.id,
             poojaNo: row.pooja_no,
             devoteeId: row.devotee_id,
+            devoteeNo: row.devotee_no,
             beneficiaryId: row.beneficiary_id,
             sponsorName: row.sponsor_name,
             beneficiaryName: row.for_self ? row.sponsor_name : row.beneficiary_name ?? "Unknown beneficiary",

@@ -20,12 +20,21 @@ import {
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { PageFooter } from "@/components/PageFooter";
+import { FormattedDateInput } from "@/components/ui/FormattedDateInput";
 import { exportReportCsv, runReportQuery } from "@/app/reports/actions";
 import { defaultReportFilters, REPORT_PAGE_SIZE } from "@/lib/reports";
+import { formatAnnualDisplayDate } from "@/lib/date-format";
 
 function displayAnnualDate(row: { annualMonth: number; annualDay: number }) {
-  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" })
-    .format(new Date(2028, row.annualMonth - 1, row.annualDay));
+  return formatAnnualDisplayDate(row.annualMonth, row.annualDay);
+}
+
+function displayGroupLabel(label: string, groupBy: ReportGroupBy) {
+  if (groupBy !== "date") return label;
+  const match = /^(\d{1,2})\s+([A-Za-z]{3})$/.exec(label.trim());
+  if (!match) return label;
+  const month = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"].indexOf(match[2].toUpperCase()) + 1;
+  return month > 0 ? formatAnnualDisplayDate(month, Number(match[1])) : label;
 }
 
 function csvCell(value: string | number) {
@@ -144,10 +153,10 @@ export function ReportsWorkspace({
         {showAdvanced && (
           <div className="report-filter-grid" id="report-filter-fields">
             <FormField id="report-from" label="From annual date">
-              <input className="form-control" id="report-from" type="date" value={filters.fromDate} onChange={(event) => update("fromDate", event.target.value)} />
+              <FormattedDateInput className="form-control" id="report-from" value={filters.fromDate ?? ""} onChange={(event) => update("fromDate", event.target.value)} />
             </FormField>
             <FormField id="report-to" label="To annual date">
-              <input className="form-control" id="report-to" type="date" value={filters.toDate} onChange={(event) => update("toDate", event.target.value)} />
+              <FormattedDateInput className="form-control" id="report-to" value={filters.toDate ?? ""} onChange={(event) => update("toDate", event.target.value)} />
             </FormField>
             <FormField id="report-devotee" label="Devotee, beneficiary, ID or phone" className="report-search-field">
               <span className="modal-search-control"><Search size={17} /><input className="form-control" id="report-devotee" value={filters.search} onChange={(event) => update("search", event.target.value)} placeholder="Search name, DEV ID, or phone…" /></span>
@@ -177,7 +186,7 @@ export function ReportsWorkspace({
           <header><div><span className="eyebrow">Summary</span><h2>Grouped by {groupBy}</h2></div><span>{page.groups.length} groups</span></header>
           <div className="report-groups">
             {page.groups.length === 0 ? <p>No grouped results.</p> : page.groups.map((group) => (
-              <div key={group.label}><span>{group.label}</span><strong>{group.count}</strong></div>
+              <div key={group.label}><span>{displayGroupLabel(group.label, groupBy)}</span><strong>{group.count}</strong></div>
             ))}
           </div>
         </section>

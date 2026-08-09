@@ -333,6 +333,60 @@ a {
   border-radius: var(--radius-md);
   font: inherit;
 }
+
+.formatted-date-input {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.formatted-date-input:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.formatted-date-input > svg {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.formatted-date-placeholder {
+  color: var(--color-text-muted);
+}
+
+.formatted-date-input > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.formatted-date-input.form-control {
+  min-height: 44px;
+}
+
+.formatted-date-input.is-bare {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .form-control:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 14%, transparent);

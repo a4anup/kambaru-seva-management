@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Clock3, FileClock, Search, ShieldCheck, User
 import { loadAuditLog } from "@/app/audit/actions";
 import { Button } from "@/components/ui/Button";
 import { PageFooter } from "@/components/PageFooter";
+import { formatDisplayTimestamp } from "@/lib/date-format";
 
 const PAGE_SIZE = 25;
 
@@ -46,14 +47,7 @@ function readable(value: string, dictionary: Record<string, string>) {
 }
 
 function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatDisplayTimestamp(value);
 }
 
 export function AuditLog({ initialPage }: { initialPage: PageResult<AuditLogRow> }) {

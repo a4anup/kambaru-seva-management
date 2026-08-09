@@ -16,6 +16,7 @@ import { TodayPoojaTable } from "@/components/TodayPoojaTable";
 import { UpcomingPoojas, type UpcomingPooja } from "@/components/UpcomingPoojas";
 import { PageFooter } from "@/components/PageFooter";
 import { getBackendServices } from "@/lib/server/backend";
+import { formatDisplayDate } from "@/lib/date-format";
 
 function dateLabel(date: Date, options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
       month: dateLabel(date, { month: "short" }).toUpperCase(),
       weekday: dateLabel(date, { weekday: "short" }),
       count: countByDate.get(value) ?? 0,
-      label: dateLabel(date, { weekday: "long", day: "2-digit", month: "short", year: "numeric" }),
+      label: formatDisplayDate(date),
       date: dateInputValue(date),
     };
   });
@@ -117,7 +118,7 @@ export default async function DashboardPage() {
         <div className="dashboard-grid">
           <TodayPoojaTable
             rows={todayRows}
-            dateLabel={dateLabel(today, { day: "2-digit", month: "short", year: "numeric", weekday: "long" })}
+            dateLabel={formatDisplayDate(today)}
             missingFieldsSummary={missingFieldsSummary}
           />
           <aside className="right-column">

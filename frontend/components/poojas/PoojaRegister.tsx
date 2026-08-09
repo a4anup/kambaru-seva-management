@@ -23,13 +23,22 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { loadBeneficiaries, loadPoojaCalendar, loadPoojaRegister, savePooja, searchDevotees } from "@/app/poojas/actions";
+import { loadDevoteeProfile } from "@/app/devotees/actions";
+import { DevoteeEditor } from "@/components/devotees/DevoteeDirectory";
+import { formatAnnualDisplayDate, formatDisplayDate } from "@/lib/date-format";
+import { FormattedDateInput } from "@/components/ui/FormattedDateInput";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const PAGE_SIZE = 10;
+const ANNUAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 type PoojaDateFilter = "today" | "tomorrow" | "week" | "month" | "all" | "custom";
 
 function todayInputValue() {
   return inputValueOf(new Date());
+}
+
+function todayAnnualInputValue() {
+  const today = new Date();
+  return `2024-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 }
 
 function inputValueOf(date: Date) {
@@ -37,6 +46,45 @@ function inputValueOf(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function daysInAnnualMonth(month: number) {
+  // A leap-year reference keeps 29 February available as an annual date.
+  return new Date(2024, month, 0).getDate();
+}
+
+function AnnualDateSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [, monthValue, dayValue] = value.split("-").map(Number);
+  const month = monthValue || 1;
+  const day = Math.min(dayValue || 1, daysInAnnualMonth(month));
+
+  function update(nextMonth: number, nextDay: number) {
+    const resolvedDay = Math.min(nextDay, daysInAnnualMonth(nextMonth));
+    onChange(`2024-${String(nextMonth).padStart(2, "0")}-${String(resolvedDay).padStart(2, "0")}`);
+  }
+
+  return (
+    <div className="pooja-editor-grid annual-date-select" role="group" aria-label="Pooja date every year">
+      <FormField id={`${id}-month`} label="Month">
+        <select className="form-control" id={`${id}-month`} value={month} onChange={(event) => update(Number(event.target.value), day)}>
+          {ANNUAL_MONTHS.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
+        </select>
+      </FormField>
+      <FormField id={`${id}-day`} label="Day">
+        <select className="form-control" id={`${id}-day`} value={day} onChange={(event) => update(month, Number(event.target.value))}>
+          {Array.from({ length: daysInAnnualMonth(month) }, (_, index) => index + 1).map((item) => <option key={item} value={item}>{String(item).padStart(2, "0")}</option>)}
+        </select>
+      </FormField>
+    </div>
+  );
 }
 
 function ageFromDateOfBirth(value: string) {
@@ -53,15 +101,16 @@ function ageFromDateOfBirth(value: string) {
 }
 
 function recurringDate(row: PoojaRegisterRow) {
-  return `${String(row.annualDay).padStart(2, "0")} ${MONTHS[row.annualMonth - 1]}`;
+  return formatAnnualDisplayDate(row.annualMonth, row.annualDay);
+}
+
+function annualValueLabel(value: string) {
+  const [, month, day] = value.split("-").map(Number);
+  return formatAnnualDisplayDate(month, day);
 }
 
 function displayFullDate(date: Date) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatDisplayDate(date);
 }
 
 function hasMissingContact(row: PoojaRegisterRow) {
@@ -247,8 +296,9 @@ export function PoojaRegister({
               <span>Custom date</span>
               <span className={`pooja-filter-control ${dateFilterMode === "custom" ? "active" : ""}`}>
                 <CalendarDays size={18} aria-hidden="true" />
-                <input
-                  type="date"
+                <FormattedDateInput
+                  className="is-bare"
+                  showIcon={false}
                   value={dateFilter}
                   onChange={(event) => {
                     setDateFilter(event.target.value);
@@ -330,7 +380,10 @@ export function PoojaRegister({
                         aria-label="Phone, address, or PIN code is missing"
                       />
                     )}
-                    <strong>{row.sponsorName}</strong>
+                    <span>
+                      <strong>{row.sponsorName}</strong>
+                      <small className="mono">{row.devoteeNo}</small>
+                    </span>
                   </span>
                   <span className="pooja-list-beneficiary">
                     <strong>{row.relation === "Self" ? "Self" : row.beneficiaryName}</strong>
@@ -385,6 +438,21 @@ export function PoojaRegister({
           row={selected}
           onClose={() => setSelected(undefined)}
           onSave={saveRow}
+          onDevoteeSave={(updated) => {
+            setRows((current) => current.map((item) => item.devoteeId === updated.id ? {
+              ...item,
+              sponsorName: updated.fullName,
+              phone: updated.phone,
+              ...(item.addressMode === "devotee_primary" ? {
+                addressLine: updated.addressLine1,
+                addressLine2: updated.addressLine2,
+                addressCity: updated.city,
+                addressDistrict: updated.district,
+                addressState: updated.state,
+                postalCode: updated.postalCode,
+              } : {}),
+            } : item));
+          }}
         />
       )}
       {adding && (
@@ -479,12 +547,13 @@ function PoojaEditor({
   row,
   onClose,
   onSave,
+  onDevoteeSave,
 }: {
   row: PoojaRegisterRow;
   onClose: () => void;
   onSave: (row: PoojaRegisterRow) => void;
+  onDevoteeSave: (row: DevoteeDirectoryRow) => void;
 }) {
-  const currentYear = new Date().getFullYear();
   const [beneficiaryName, setBeneficiaryName] = useState(row.beneficiaryName);
   const [relation, setRelation] = useState(row.relation);
   const [beneficiaryPhone, setBeneficiaryPhone] = useState(row.beneficiaryPhone ?? "");
@@ -493,7 +562,7 @@ function PoojaEditor({
   const [beneficiaryGotra, setBeneficiaryGotra] = useState(row.beneficiaryGotra ?? "");
   const [beneficiaryNotes, setBeneficiaryNotes] = useState(row.beneficiaryNotes ?? "");
   const [date, setDate] = useState(
-    `${currentYear}-${String(row.annualMonth).padStart(2, "0")}-${String(row.annualDay).padStart(2, "0")}`,
+    `2024-${String(row.annualMonth).padStart(2, "0")}-${String(row.annualDay).padStart(2, "0")}`,
   );
   const [status, setStatus] = useState<EnrollmentStatus>(row.status);
   const [addressMode, setAddressMode] = useState(row.addressMode);
@@ -511,15 +580,65 @@ function PoojaEditor({
   const [error, setError] = useState<string>();
   const [editStep, setEditStep] = useState(1);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [linkedDevotee, setLinkedDevotee] = useState<DevoteeDirectoryRow>();
+  const [editingDevotee, setEditingDevotee] = useState(false);
+  const [devoteeLoadError, setDevoteeLoadError] = useState<string>();
+  const [isLoadingDevotee, startLoadingDevotee] = useTransition();
   const [isSaving, startSaving] = useTransition();
+  const sponsorName = linkedDevotee?.fullName ?? row.sponsorName;
+  const sponsorPhone = linkedDevotee?.phone ?? row.phone;
+  const primaryAddress = linkedDevotee ? {
+    line1: linkedDevotee.addressLine1,
+    line2: linkedDevotee.addressLine2,
+    city: linkedDevotee.city,
+    district: linkedDevotee.district,
+    state: linkedDevotee.state,
+    postalCode: linkedDevotee.postalCode,
+  } : row.addressMode === "devotee_primary" ? {
+    line1: row.addressLine,
+    line2: row.addressLine2,
+    city: row.addressCity,
+    district: row.addressDistrict,
+    state: row.addressState,
+    postalCode: row.postalCode,
+  } : undefined;
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !editingDevotee) onClose();
     }
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  }, [editingDevotee, onClose]);
+
+  useEffect(() => {
+    if ((editStep !== 3 && editStep !== 4) || addressMode !== "devotee_primary" || linkedDevotee || isLoadingDevotee) return;
+    startLoadingDevotee(async () => {
+      const devotee = await loadDevoteeProfile(row.devoteeId);
+      if (!devotee) {
+        setDevoteeLoadError("The linked devotee profile could not be loaded.");
+        return;
+      }
+      setLinkedDevotee(devotee);
+    });
+  }, [addressMode, editStep, isLoadingDevotee, linkedDevotee, row.devoteeId]);
+
+  function openDevoteeEditor() {
+    setDevoteeLoadError(undefined);
+    if (linkedDevotee) {
+      setEditingDevotee(true);
+      return;
+    }
+    startLoadingDevotee(async () => {
+      const devotee = await loadDevoteeProfile(row.devoteeId);
+      if (!devotee) {
+        setDevoteeLoadError("The linked devotee profile could not be loaded.");
+        return;
+      }
+      setLinkedDevotee(devotee);
+      setEditingDevotee(true);
+    });
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -579,6 +698,7 @@ function PoojaEditor({
   }
 
   return (
+    <>
     <div className="pooja-editor-layer" role="presentation">
       <button className="pooja-editor-backdrop" aria-label="Close pooja details" onClick={onClose} type="button" />
       <aside className="pooja-editor pooja-editor-modal" role="dialog" aria-modal="true" aria-labelledby="pooja-editor-title">
@@ -586,18 +706,15 @@ function PoojaEditor({
           <div>
             <span className="eyebrow">Enrollment details</span>
             <h2 id="pooja-editor-title">{row.beneficiaryName}</h2>
-            <p>Sponsored by {row.sponsorName} · {row.phone ?? "No phone"}</p>
+            <p>Sponsored by {sponsorName} · {sponsorPhone ?? "No phone"}</p>
           </div>
           <div className="pooja-editor-header-actions">
-            <Link className="ui-button ui-button-outline" href={`/devotees?edit=${encodeURIComponent(row.devoteeId)}`}>
-              <UserRoundPen size={17} /> Edit Devotee Profile
-            </Link>
             <button className="icon-button" aria-label="Close pooja details" onClick={onClose} type="button"><X size={21} /></button>
           </div>
         </header>
 
         <form className="pooja-editor-form" onSubmit={submit}>
-          {error && <Alert>{error}</Alert>}
+          {(error || devoteeLoadError) && <Alert>{error ?? devoteeLoadError}</Alert>}
           <div className="devotee-stepper pooja-edit-stepper" aria-label={`Edit pooja step ${editStep} of 4`}>
             {["Beneficiary", "Spiritual", "Address", "Review"].map((label, index) => (
               <button
@@ -615,30 +732,46 @@ function PoojaEditor({
           {editStep === 1 && (
             <fieldset className="pooja-address-fields modal-form-section">
               <legend>Beneficiary and annual date</legend>
-              <FormField id="linked-devotee" label="Devotee" help="The devotee linked to this pooja cannot be changed.">
-                <input className="form-control" id="linked-devotee" value={row.sponsorName} readOnly aria-readonly="true" />
-              </FormField>
+              <div className="form-field linked-devotee-field">
+                <label className="form-label" htmlFor="linked-devotee">Devotee</label>
+                <div className="linked-devotee-control-row">
+                  <input className="form-control linked-devotee-readonly" id="linked-devotee" value={sponsorName} readOnly aria-readonly="true" />
+                  <Button variant="outline" onClick={openDevoteeEditor} disabled={isLoadingDevotee}>
+                    <UserRoundPen size={17} /> {isLoadingDevotee ? "Loading…" : "Edit Devotee Profile"}
+                  </Button>
+                </div>
+                <small className="form-help">The devotee linked to this pooja cannot be changed.</small>
+              </div>
               <div className="pooja-editor-grid">
                 <FormField id="beneficiary-relation" label="Relation">
                   <select className="form-control" id="beneficiary-relation" value={relation} onChange={(event) => {
                     const next = event.target.value as PoojaRegisterRow["relation"];
                     setRelation(next);
-                    if (next === "Self") setBeneficiaryName(row.sponsorName);
+                    if (next === "Self") setBeneficiaryName(sponsorName);
                   }}>
                     {["Self", "Son", "Daughter", "Wife", "Husband", "Father", "Mother", "Other"].map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </FormField>
                 <FormField id="beneficiary-name" label="Beneficiary name">
-                  <input className="form-control" id="beneficiary-name" disabled={relation === "Self"} value={relation === "Self" ? row.sponsorName : beneficiaryName} onChange={(event) => setBeneficiaryName(event.target.value)} />
+                  <input
+                    className={`form-control ${relation === "Self" ? "linked-devotee-readonly" : ""}`.trim()}
+                    id="beneficiary-name"
+                    readOnly={relation === "Self"}
+                    aria-readonly={relation === "Self"}
+                    value={relation === "Self" ? sponsorName : beneficiaryName}
+                    onChange={(event) => setBeneficiaryName(event.target.value)}
+                  />
                 </FormField>
               </div>
               <div className="pooja-editor-grid">
                 <FormField id="beneficiary-phone" label="Beneficiary phone">
                   <input className="form-control" id="beneficiary-phone" inputMode="tel" value={beneficiaryPhone} onChange={(event) => setBeneficiaryPhone(event.target.value)} />
                 </FormField>
-                <FormField id="annual-date" label="Pooja date every year" help="Only the month and day repeat.">
-                  <input className="form-control" id="annual-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-                </FormField>
+                <div className="form-field annual-date-field">
+                  <span className="form-label">Pooja date every year</span>
+                  <AnnualDateSelect id="annual-date" value={date} onChange={setDate} />
+                  <small className="form-help">Only the month and day repeat.</small>
+                </div>
               </div>
               <FormField id="beneficiary-notes" label="Beneficiary notes">
                 <input className="form-control" id="beneficiary-notes" value={beneficiaryNotes} onChange={(event) => setBeneficiaryNotes(event.target.value)} />
@@ -659,7 +792,7 @@ function PoojaEditor({
                 <summary>Enrollment and payment details</summary>
                 <div className="pooja-editor-grid">
                   <FormField id="enrollment-status" label="Status"><select className="form-control" id="enrollment-status" value={status} onChange={(event) => setStatus(event.target.value as EnrollmentStatus)}><option value="active">Active</option><option value="paused">Paused</option><option value="cancelled">Cancelled</option></select></FormField>
-                  <FormField id="enrollment-date" label="Enrollment date"><input className="form-control" id="enrollment-date" type="date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} /></FormField>
+                  <FormField id="enrollment-date" label="Enrollment date"><FormattedDateInput className="form-control" id="enrollment-date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} /></FormField>
                   <FormField id="pooja-fee" label="Fee (₹)"><input className="form-control" id="pooja-fee" type="number" min="0" value={fee} onChange={(event) => setFee(event.target.value)} /></FormField>
                   <FormField id="receipt-number" label="Receipt number"><input className="form-control" id="receipt-number" value={receiptNumber} onChange={(event) => setReceiptNumber(event.target.value)} /></FormField>
                 </div>
@@ -678,7 +811,20 @@ function PoojaEditor({
                 </select>
               </FormField>
               {addressMode === "devotee_primary" ? (
-                <div className="modal-created-summary"><div><span>Devotee primary address</span><strong>This pooja will follow {row.sponsorName}&apos;s current primary address. The linked devotee cannot be changed while editing a pooja.</strong></div></div>
+                <div className="modal-created-summary devotee-primary-address-summary">
+                  <div>
+                    <span>Devotee primary address</span>
+                    <strong>This pooja will follow {sponsorName}&apos;s current primary address. The linked devotee cannot be changed while editing a pooja.</strong>
+                    {primaryAddress ? (
+                      <address>
+                        <strong>{primaryAddress.line1 || "Address line 1 not provided"}</strong>
+                        {primaryAddress.line2 && <strong>{primaryAddress.line2}</strong>}
+                        <strong>{[primaryAddress.city, primaryAddress.district].filter(Boolean).join(", ") || "City not provided"}</strong>
+                        <strong>{[primaryAddress.state, primaryAddress.postalCode].filter(Boolean).join(" — ") || "State and PIN not provided"}</strong>
+                      </address>
+                    ) : <small>{isLoadingDevotee ? "Loading full address…" : "Full primary address is not available."}</small>}
+                  </div>
+                </div>
               ) : (
                 <div className="pooja-custom-address-editor">
                   <FormField id="address-line" label="Custom address line 1"><input className="form-control" id="address-line" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></FormField>
@@ -698,12 +844,32 @@ function PoojaEditor({
             <section className="modal-form-section pooja-review-section">
               <header><span><CheckCircle2 size={17} /></span><div><h3>Review changes</h3><p>Confirm the enrollment and dispatch information</p></div></header>
               <div className="pooja-review-grid">
-                <div><span>Devotee</span><strong>{row.sponsorName}</strong></div>
-                <div><span>Beneficiary</span><strong>{relation === "Self" ? row.sponsorName : beneficiaryName} · {relation}</strong></div>
-                <div><span>Every year</span><strong>{date}</strong></div>
+                <div><span>Devotee</span><strong>{sponsorName}</strong></div>
+                <div><span>Beneficiary</span><strong>{relation === "Self" ? sponsorName : beneficiaryName} · {relation}</strong></div>
+                <div><span>Every year</span><strong>{annualValueLabel(date)}</strong></div>
                 <div><span>Status</span><strong>{status}</strong></div>
                 <div className="wide"><span>Spiritual details</span><strong>{[beneficiaryRashi, beneficiaryNakshatra, beneficiaryGotra].filter(Boolean).join(" · ") || "Not provided"}</strong></div>
-                <div className="wide"><span>Dispatch address</span><strong>{addressMode === "devotee_primary" ? `Devotee primary address · follows ${row.sponsorName}'s profile` : [addressLine, addressLine2, addressCity, addressDistrict, addressState, postalCode].filter(Boolean).join(", ") || "Custom address not provided"}</strong></div>
+                <div className="wide pooja-review-address">
+                  <span>Dispatch address</span>
+                  <strong>{addressMode === "devotee_primary" ? `Devotee primary address · follows ${sponsorName}'s profile` : "Custom address for this pooja"}</strong>
+                  {addressMode === "devotee_primary" ? (
+                    primaryAddress ? (
+                      <address>
+                        <strong>{primaryAddress.line1 || "Address line 1 not provided"}</strong>
+                        {primaryAddress.line2 && <strong>{primaryAddress.line2}</strong>}
+                        <strong>{[primaryAddress.city, primaryAddress.district].filter(Boolean).join(", ") || "City not provided"}</strong>
+                        <strong>{[primaryAddress.state, primaryAddress.postalCode].filter(Boolean).join(" — ") || "State and PIN not provided"}</strong>
+                      </address>
+                    ) : <small>{isLoadingDevotee ? "Loading full address…" : "Full primary address is not available."}</small>
+                  ) : (
+                    <address>
+                      <strong>{addressLine || "Address line 1 not provided"}</strong>
+                      {addressLine2 && <strong>{addressLine2}</strong>}
+                      <strong>{[addressCity, addressDistrict].filter(Boolean).join(", ") || "City not provided"}</strong>
+                      <strong>{[addressState, postalCode].filter(Boolean).join(" — ") || "State and PIN not provided"}</strong>
+                    </address>
+                  )}
+                </div>
                 <div className="wide"><span>Pooja remarks</span><strong>{notes || "Not provided"}</strong></div>
               </div>
               <label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} onChange={(event) => { setAcknowledged(event.target.checked); setError(undefined); }} /><span>I reviewed these changes and confirm this Shashwatha Pooja.</span></label>
@@ -725,6 +891,19 @@ function PoojaEditor({
         </form>
       </aside>
     </div>
+    {editingDevotee && linkedDevotee && (
+      <DevoteeEditor
+        key={`${linkedDevotee.id}-${linkedDevotee.modifiedAt}`}
+        row={linkedDevotee}
+        onClose={() => setEditingDevotee(false)}
+        onSave={(updated) => {
+          setLinkedDevotee(updated);
+          onDevoteeSave(updated);
+          setEditingDevotee(false);
+        }}
+      />
+    )}
+    </>
   );
 }
 
@@ -777,7 +956,7 @@ function AddPoojaModal({
   const [beneficiaryNakshatra, setBeneficiaryNakshatra] = useState("");
   const [beneficiaryGotra, setBeneficiaryGotra] = useState("");
   const [beneficiaryNotes, setBeneficiaryNotes] = useState("");
-  const [annualDate, setAnnualDate] = useState(todayInputValue);
+  const [annualDate, setAnnualDate] = useState(todayAnnualInputValue);
   const [addressMode, setAddressMode] = useState<PoojaRegisterRow["addressMode"]>("devotee_primary");
   const [addressLine, setAddressLine] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
@@ -1094,7 +1273,7 @@ function AddPoojaModal({
                 </FormField>
                 <div className="dob-age-grid">
                   <FormField id="new-devotee-dob" label="Date of birth">
-                    <input className="form-control" id="new-devotee-dob" type="date" max={todayInputValue()} value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
+                    <FormattedDateInput className="form-control" id="new-devotee-dob" max={todayInputValue()} value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
                   </FormField>
                   <div className="calculated-age" aria-live="polite">
                     <span>Current age</span>
@@ -1172,7 +1351,7 @@ function AddPoojaModal({
                   <div className="devotee-review-grid">
                     <div className="review-row review-row-two">
                       <div><span>Name</span><strong>{devoteeName || "Not provided"}</strong></div>
-                      <div><span>Date of birth / Age</span><strong>{dateOfBirth ? `${dateOfBirth} · ${ageFromDateOfBirth(dateOfBirth) ?? "—"} years` : "Not provided"}</strong></div>
+                      <div><span>Date of birth / Age</span><strong>{dateOfBirth ? `${formatDisplayDate(dateOfBirth)} · ${ageFromDateOfBirth(dateOfBirth) ?? "—"} years` : "Not provided"}</strong></div>
                     </div>
                     <div className="review-row review-row-two">
                       <div><span>Primary phone</span><strong>{phone || "Not provided"}</strong></div>
@@ -1301,9 +1480,11 @@ function AddPoojaModal({
                 </FormField>
               </>
             )}
-            <FormField id="new-annual-date" label="Pooja date every year" help="Only the month and day repeat.">
-              <input className="form-control" id="new-annual-date" type="date" value={annualDate} onChange={(event) => setAnnualDate(event.target.value)} />
-            </FormField>
+            <div className="form-field annual-date-field">
+              <span className="form-label">Pooja date every year</span>
+              <AnnualDateSelect id="new-annual-date" value={annualDate} onChange={setAnnualDate} />
+              <small className="form-help">Only the month and day repeat.</small>
+            </div>
           </fieldset>
           )}
 
@@ -1331,7 +1512,7 @@ function AddPoojaModal({
                   <input className="form-control" id="new-pooja-fee" type="number" min="0" value={fee} onChange={(event) => setFee(event.target.value)} />
                 </FormField>
                 <FormField id="new-enrollment-date" label="Enrollment date">
-                  <input className="form-control" id="new-enrollment-date" type="date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} />
+                  <FormattedDateInput className="form-control" id="new-enrollment-date" value={enrollmentDate} onChange={(event) => setEnrollmentDate(event.target.value)} />
                 </FormField>
               </div>
               <div className="pooja-editor-grid">
@@ -1405,7 +1586,7 @@ function AddPoojaModal({
               <div className="pooja-review-grid">
                 <div><span>Devotee</span><strong>{selectedDevotee?.fullName ?? devoteeName}</strong></div>
                 <div><span>Beneficiary</span><strong>{forSelf ? selectedDevotee?.fullName ?? devoteeName : beneficiaryName || "Not provided"} · {forSelf ? "Self" : relation}</strong></div>
-                <div><span>Every year</span><strong>{annualDate}</strong></div>
+                <div><span>Every year</span><strong>{annualValueLabel(annualDate)}</strong></div>
                 <div><span>Rashi / Nakshatra / Gotra</span><strong>{[beneficiaryRashi, beneficiaryNakshatra, beneficiaryGotra].filter(Boolean).join(" · ") || "Not provided"}</strong></div>
                 <div className="wide"><span>Address</span><strong>{addressMode === "devotee_primary" ? [selectedDevotee?.addressLine1 ?? addressLine, selectedDevotee?.addressLine2 ?? addressLine2, selectedDevotee?.city ?? city, selectedDevotee?.state ?? state, selectedDevotee?.postalCode ?? postalCode].filter(Boolean).join(", ") : [addressLine, addressLine2, city, district, state, postalCode].filter(Boolean).join(", ") || "Not provided"}</strong></div>
                 <div className="wide"><span>Remarks</span><strong>{beneficiaryNotes || "Not provided"}</strong></div>

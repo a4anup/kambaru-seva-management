@@ -1,6 +1,7 @@
 import { CalendarDays, LogOut, Menu } from "lucide-react";
 import { signOut } from "@/app/login/actions";
 import { useStaffSession } from "@/components/auth/StaffSessionProvider";
+import { formatDisplayDate } from "@/lib/date-format";
 
 export function Header({
   title,
@@ -14,13 +15,7 @@ export function Header({
   className?: string;
 }) {
   const staff = useStaffSession();
-  const formattedDate = new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    weekday: "long",
-    timeZone: "Asia/Kolkata",
-  }).format(new Date());
+  const formattedDate = formatDisplayDate(new Date());
 
   return (
     <header className={`topbar ${className}`.trim()}>

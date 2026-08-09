@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/Button";
 import { PageFooter } from "@/components/PageFooter";
 import { getInvitationLabels, getLabelsForDate } from "@/app/labels/actions";
+import { formatDisplayDate } from "@/lib/date-format";
+import { FormattedDateInput } from "@/components/ui/FormattedDateInput";
 
 type DateChoice = "today" | "tomorrow" | "custom" | "range" | "all" | "devotees" | "beneficiaries";
 
@@ -84,13 +86,7 @@ function addDays(date: Date, days: number) {
 }
 
 function displayDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: TEMPLE_TIME_ZONE,
-  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+  return formatDisplayDate(value);
 }
 
 function inputDate(date: Date) {
@@ -297,18 +293,17 @@ export function LabelGenerator({
           <div className="label-date-range">
             <label className="label-custom-date">
               <span>From date</span>
-              <input type="date" value={rangeFrom} max={rangeTo || undefined} onChange={(event) => { setRangeFrom(event.target.value); setPreviewPage(1); }} />
+              <FormattedDateInput value={rangeFrom} max={rangeTo || undefined} onChange={(event) => { setRangeFrom(event.target.value); setPreviewPage(1); }} />
             </label>
             <label className="label-custom-date">
               <span>To date</span>
-              <input type="date" value={rangeTo} min={rangeFrom || undefined} onChange={(event) => { setRangeTo(event.target.value); setPreviewPage(1); }} />
+              <FormattedDateInput value={rangeTo} min={rangeFrom || undefined} onChange={(event) => { setRangeTo(event.target.value); setPreviewPage(1); }} />
             </label>
           </div>
         ) : (
           <label className={`label-custom-date ${choice !== "custom" ? "is-muted" : ""}`}>
             <span>Date</span>
-            <input
-              type="date"
+            <FormattedDateInput
               value={customDate}
               onChange={(event) => {
                 setCustomDate(event.target.value);

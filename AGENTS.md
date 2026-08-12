@@ -26,6 +26,9 @@ configurable placeholders where safe (e.g. the Feb 29 policy).
 - Snapshot operational data in occurrences so history does not change after profile edits.
 - Make scheduled jobs, imports, notifications, and webhook handlers idempotent.
 - Prefer archive/status transitions to destructive deletes.
+- A user-facing Pooja Enrollment delete transitions the enrollment to `cancelled`,
+  hides it from operational reads, and writes an Audit Log event; never physically
+  delete the enrollment or its occurrences.
 - Use database constraints in addition to application validation.
 - Put schema changes in version-controlled migrations; never make undocumented production-only changes.
 - Keep user-facing terminology externalized for local-language support.

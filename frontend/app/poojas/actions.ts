@@ -131,3 +131,26 @@ export async function savePooja(input: unknown): Promise<SavePoojaResult> {
     return { ok: false, message: "The pooja could not be saved. Please try again." };
   }
 }
+
+export async function archivePooja(enrollmentId: string, expectedModifiedAt: string) {
+  const parsed = z.object({
+    enrollmentId: z.string().uuid(),
+    expectedModifiedAt: z.string().datetime({ offset: true }),
+  }).safeParse({ enrollmentId, expectedModifiedAt });
+  if (!parsed.success) return { ok: false as const, message: "Refresh this pooja and try again." };
+  try {
+    await (await getBackendServices()).enrollments.archive(parsed.data.enrollmentId, parsed.data.expectedModifiedAt);
+    revalidatePath("/poojas");
+    revalidatePath("/dashboard");
+    revalidatePath("/devotees");
+    revalidatePath("/reports");
+    revalidatePath("/labels");
+    revalidatePath("/audit");
+    return { ok: true as const };
+  } catch (error) {
+    if (error instanceof Error && error.message === "CONFLICT") {
+      return { ok: false as const, message: "This pooja changed in another session. Refresh and try again." };
+    }
+    return { ok: false as const, message: "The pooja could not be deleted. Please try again." };
+  }
+}

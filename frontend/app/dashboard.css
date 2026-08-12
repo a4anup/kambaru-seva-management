@@ -1965,7 +1965,7 @@ input {
     minmax(145px, 0.75fr)
     120px
     minmax(190px, 1fr)
-    96px;
+    142px;
   align-items: center;
   gap: var(--space-4);
 }
@@ -2092,10 +2092,96 @@ input {
   font-size: 0.68rem;
 }
 
+.pooja-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .pooja-row-edit {
   min-height: 38px;
   padding-inline: var(--space-3);
-  justify-self: stretch;
+}
+
+.pooja-row-delete {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+}
+
+.pooja-delete-layer {
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.pooja-delete-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(500px, 100%);
+  padding: var(--space-6);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.pooja-delete-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.pooja-delete-dialog h2 {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.pooja-delete-dialog p {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.pooja-delete-dialog > .ui-alert,
+.pooja-delete-agreement,
+.pooja-delete-actions {
+  grid-column: 1 / -1;
+}
+
+.pooja-delete-agreement {
+  min-height: 54px;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background-subtle);
+  color: var(--color-text-primary);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pooja-delete-agreement input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--color-danger);
+}
+
+.pooja-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .pooja-contact-warning {

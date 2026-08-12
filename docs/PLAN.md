@@ -81,6 +81,10 @@ produces print-ready courier labels, with no re-entry required in future years.
    staff can fill in, validated before commit) — this project replaces years of
    paper records, so a migration path is part of MVP, not an afterthought.
 
+Deleting a Pooja Enrollment is a recoverable cancellation, not a physical row
+deletion. It is removed from operational Pooja lists, calendars, dashboard counts,
+and labels while its record, occurrences, reference number, and audit history remain.
+
 ### Later phases (design for, don't build yet)
 - Devotee self-service portal (view/renew own enrollments).
 - Daily summary notification to staff (email first; WhatsApp/SMS later).

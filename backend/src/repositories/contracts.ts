@@ -49,6 +49,7 @@ export interface TempleRepository {
   updateDevotee(input: SaveDevoteeInput & { id: string; expectedModifiedAt: string }): Promise<Devotee>;
   createEnrollment(input: SaveEnrollmentInput): Promise<PoojaEnrollment>;
   updateEnrollment(input: SaveEnrollmentInput & { id: string; expectedModifiedAt: string }): Promise<PoojaEnrollment>;
+  archiveEnrollment(enrollmentId: string, expectedModifiedAt: string): Promise<boolean>;
   listDonationTypes(): Promise<DonationType[]>;
   listDonationsPage(input: DonationFilters & { page: number; pageSize: number }): Promise<DonationPage>;
   listDonationGroupsPage(input: { search?: string; sortBy?: string; page: number; pageSize: number }): Promise<DonationGroupPage>;

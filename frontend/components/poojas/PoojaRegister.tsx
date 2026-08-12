@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -14,6 +15,7 @@ import {
   Search,
   Sparkles,
   TriangleAlert,
+  Trash2,
   UserRoundPen,
   X,
 } from "lucide-react";
@@ -22,7 +24,7 @@ import { PageFooter } from "@/components/PageFooter";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
-import { loadBeneficiaries, loadPoojaCalendar, loadPoojaRegister, savePooja, searchDevotees } from "@/app/poojas/actions";
+import { archivePooja, loadBeneficiaries, loadPoojaCalendar, loadPoojaRegister, savePooja, searchDevotees } from "@/app/poojas/actions";
 import { loadDevoteeProfile } from "@/app/devotees/actions";
 import { DevoteeEditor } from "@/components/devotees/DevoteeDirectory";
 import { formatAnnualDisplayDate, formatDisplayDate } from "@/lib/date-format";
@@ -152,6 +154,7 @@ export function PoojaRegister({
     return new Date(`${value}T00:00:00`);
   });
   const [selected, setSelected] = useState<PoojaRegisterRow>();
+  const [deleting, setDeleting] = useState<PoojaRegisterRow>();
   const [adding, setAdding] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string>();
   const [calendarCounts, setCalendarCounts] = useState(initialCalendarCounts);
@@ -353,7 +356,7 @@ export function PoojaRegister({
           <span>Phone Number</span>
           <span>Every year</span>
           <span>Address</span>
-          <span>Edit</span>
+          <span>Actions</span>
         </div>
 
         <div className="pooja-list" aria-live="polite">
@@ -398,9 +401,14 @@ export function PoojaRegister({
                   <span className="pooja-list-address">
                     {[row.addressCity, row.postalCode].filter(Boolean).join(" — ") || "Address missing"}
                   </span>
-                  <Button className="pooja-row-edit" variant="outline" onClick={() => setSelected(row)}>
-                    <Pencil size={16} /> Edit
-                  </Button>
+                  <span className="pooja-row-actions">
+                    <Button className="pooja-row-edit" variant="outline" onClick={() => setSelected(row)}>
+                      <Pencil size={16} /> Edit
+                    </Button>
+                    <Button className="pooja-row-delete" variant="danger" onClick={() => setDeleting(row)} aria-label={`Delete ${row.beneficiaryName}'s pooja`} title="Delete pooja">
+                      <Trash2 size={16} />
+                    </Button>
+                  </span>
                 </article>
               );
             })
@@ -469,7 +477,65 @@ export function PoojaRegister({
           }}
         />
       )}
+      {deleting && createPortal(
+        <PoojaDeleteConfirm
+          row={deleting}
+          onClose={() => setDeleting(undefined)}
+          onDeleted={() => {
+            setRows((current) => current.filter((item) => item.enrollmentId !== deleting.enrollmentId));
+            setTotal((current) => Math.max(0, current - 1));
+            setDeleting(undefined);
+            setSavedMessage(`${deleting.beneficiaryName}'s pooja was deleted.`);
+          }}
+        />,
+        document.body,
+      )}
     </section>
+  );
+}
+
+function PoojaDeleteConfirm({ row, onClose, onDeleted }: { row: PoojaRegisterRow; onClose: () => void; onDeleted: () => void }) {
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState<string>();
+  const [pending, startDeleting] = useTransition();
+
+  function confirmDelete() {
+    if (!agreed) return;
+    setError(undefined);
+    startDeleting(async () => {
+      const result = await archivePooja(row.enrollmentId, row.modifiedAt);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      onDeleted();
+    });
+  }
+
+  return (
+    <div className="pooja-editor-layer pooja-delete-layer">
+      <button className="pooja-editor-backdrop" onClick={onClose} aria-label="Close delete confirmation" />
+      <section className="pooja-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="pooja-delete-title">
+        <span className="pooja-delete-icon" aria-hidden="true"><Trash2 size={22} /></span>
+        <div>
+          <span className="eyebrow">Delete Pooja Enrollment</span>
+          <h2 id="pooja-delete-title">Delete this pooja?</h2>
+          <p><strong>{row.beneficiaryName}</strong> · {row.poojaNo}</p>
+          <p>This pooja will be removed from operational lists, calendars, labels, and dashboard counts. Its record and audit history will be preserved.</p>
+        </div>
+        {error && <Alert icon={TriangleAlert} tone="warning" role="alert">{error}</Alert>}
+        <label className="pooja-delete-agreement">
+          <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
+          <span>I understand and agree to delete this Pooja Enrollment.</span>
+        </label>
+        <div className="pooja-delete-actions">
+          <Button variant="outline" onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={!agreed || pending}>
+            <Trash2 size={16} /> {pending ? "Deleting…" : "Delete Pooja"}
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }
 

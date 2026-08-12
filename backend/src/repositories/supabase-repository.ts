@@ -569,6 +569,12 @@ export function createSupabaseTempleRepository(
       });
       return mapEnrollment(row);
     },
+    async archiveEnrollment(enrollmentId, expectedModifiedAt) {
+      return callRpc<boolean>(config, "archive_pooja_enrollment", {
+        target_enrollment_id: enrollmentId,
+        expected_modified_at: expectedModifiedAt,
+      });
+    },
     async listDonationTypes() {
       const rows = await callRpc<Array<{ id: string; name: string; description?: string; active: boolean; display_order: number }>>(config, "donation_types_active", {});
       return rows.map((row) => ({ id: row.id, name: row.name, description: row.description, active: row.active, displayOrder: row.display_order }));

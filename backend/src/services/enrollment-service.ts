@@ -49,5 +49,9 @@ export function createEnrollmentService(templeData: TempleRepository) {
       if (!enrollment) throw new Error("Updated enrollment could not be loaded.");
       return enrollment;
     },
+
+    async archive(enrollmentId: string, expectedModifiedAt: string) {
+      return templeData.archiveEnrollment(enrollmentId, expectedModifiedAt);
+    },
   };
 }

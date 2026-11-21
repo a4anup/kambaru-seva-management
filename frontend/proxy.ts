@@ -30,16 +30,24 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (!user && !PUBLIC_PATHS.has(pathname)) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    return redirectWithCookies(request, response, "/login");
   }
   if (user && pathname === "/login") {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/dashboard";
-    return NextResponse.redirect(dashboardUrl);
+    return redirectWithCookies(request, response, "/dashboard");
   }
   return response;
+}
+
+// Carry any cookies Supabase wrote during getUser() onto the redirect. When a
+// stale refresh token is rejected, Supabase clears the session cookies via
+// setAll; dropping them here would leave the dead cookie in the browser and
+// re-trigger "refresh_token_not_found" on every request.
+function redirectWithCookies(request: NextRequest, source: NextResponse, pathname: string) {
+  const target = request.nextUrl.clone();
+  target.pathname = pathname;
+  const redirect = NextResponse.redirect(target);
+  source.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
 }
 
 export const config = {

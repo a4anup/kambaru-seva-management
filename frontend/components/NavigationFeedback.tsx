@@ -22,10 +22,11 @@ function isInternalNavigation(event: MouseEvent) {
     !destination.hash;
 }
 
-// The destination page stays mounted (and visible) underneath this overlay
-// until it's actually ready — there is no app/loading.tsx swap in between, so
-// navigation never looks like a fresh blank screen. A short delay avoids the
-// overlay flashing on near-instant transitions.
+// The current page stays visible underneath this overlay until the next route
+// commits. Data-heavy routes have a loading.tsx (components/PageLoading) that
+// keeps the sidebar/header and shows a skeleton — never a blank screen — and
+// its commit changes the pathname, which clears this overlay. A short delay
+// avoids the overlay flashing on near-instant transitions.
 const OVERLAY_DELAY_MS = 200;
 
 export function NavigationFeedback() {

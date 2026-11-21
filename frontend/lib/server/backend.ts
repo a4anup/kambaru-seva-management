@@ -5,16 +5,13 @@ import {
   createTempleServices,
 } from "@kambaru/backend";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser, getRequestSupabase } from "@/lib/server/auth";
 import { supabaseConfig } from "@/lib/supabase/config";
 
 export async function getBackendServices() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) redirect("/login");
+  const supabase = await getRequestSupabase();
+  const user = await getAuthenticatedUser();
+  if (!user) redirect("/login");
 
   const {
     data: { session },

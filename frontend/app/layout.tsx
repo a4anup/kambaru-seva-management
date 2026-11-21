@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { StaffSessionProvider, type StaffSession } from "@/components/auth/StaffSessionProvider";
+import { StaffSessionProvider } from "@/components/auth/StaffSessionProvider";
 import { NavigationFeedback } from "@/components/NavigationFeedback";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getStaffSession } from "@/lib/server/auth";
 import logo from "@/assets/logo.png";
 import "./globals.css";
 import "./dashboard.css";
@@ -20,25 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  let staff: StaffSession | null = null;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("staff_profiles")
-      .select("display_name, role, is_active")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (profile?.is_active) {
-      staff = {
-        id: user.id,
-        displayName: profile.display_name,
-        role: profile.role,
-      };
-    }
-  }
+  const staff = await getStaffSession();
   return (
     <html lang="en">
       <body>

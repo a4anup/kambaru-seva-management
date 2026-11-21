@@ -1,5 +1,6 @@
 "use client";
 
+import { AddressVerificationBadge, AddressVerificationField } from "@/components/AddressVerificationField";
 import { FormEvent, useEffect, useState, useTransition } from "react";
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Eye, MapPin, Pencil, Phone, Plus, Search, TriangleAlert, Users, X } from "lucide-react";
 import type { DevoteeDirectoryPage, DevoteeDirectoryRow, DevoteePoojaDate } from "@kambaru/backend";
@@ -183,6 +184,7 @@ export function DevoteeDirectory({
               </span>
               <span className={`devotee-city ${row.city === "City missing" ? "missing" : ""}`}>
                 <MapPin size={15} aria-hidden="true" /> {row.city}
+                {row.addressVerificationStatus === "unverified" && <AddressVerificationBadge status="unverified" />}
               </span>
               <span className={`devotee-pin mono ${row.postalCode === "PIN missing" || !/^\d{6}$/.test(row.postalCode) ? "missing" : ""}`}>
                 {row.postalCode}
@@ -251,6 +253,8 @@ export function DevoteeDirectory({
             devoteeNo: "",
             fullName: "",
             phone: null,
+            addressVerificationStatus: "verified",
+            primaryAddressPoojaCount: 0,
             addressLine1: "",
             city: "City missing",
             state: "",
@@ -366,6 +370,8 @@ export function DevoteeEditor({
   const [district, setDistrict] = useState(row.district ?? "");
   const [state, setState] = useState(row.state);
   const [postalCode, setPostalCode] = useState(/^\d{6}$/.test(row.postalCode) ? row.postalCode : "");
+  const [addressVerificationStatus, setAddressVerificationStatus] = useState(row.addressVerificationStatus);
+  const [addressVerificationReason, setAddressVerificationReason] = useState(row.addressVerificationReason ?? "");
   const [notes, setNotes] = useState(row.notes ?? "");
   const [error, setError] = useState<string>();
   const [step, setStep] = useState(1);
@@ -405,6 +411,8 @@ export function DevoteeEditor({
         nakshatra,
         gotra,
         notes,
+        addressVerificationStatus,
+        addressVerificationReason,
         addressLine1,
         addressLine2,
         city,
@@ -449,6 +457,7 @@ export function DevoteeEditor({
               <button
                 className={step === index + 1 ? "active" : step > index + 1 ? "complete" : ""}
                 key={label}
+                aria-label={label}
                 onClick={() => { setStep(index + 1); setError(undefined); }}
                 type="button"
                 aria-current={step === index + 1 ? "step" : undefined}
@@ -507,6 +516,8 @@ export function DevoteeEditor({
           </section>}
           {step === 3 && <fieldset className="pooja-address-fields modal-form-section">
             <legend>03 · Primary address</legend>
+            <AddressVerificationField id="devotee-address-verification" status={addressVerificationStatus} reason={addressVerificationReason} onStatusChange={setAddressVerificationStatus} onReasonChange={setAddressVerificationReason} />
+            {!isNew && <p role="status">This primary address and its verification status are used by {row.primaryAddressPoojaCount} active pooja{row.primaryAddressPoojaCount === 1 ? "" : "s"}. Custom pooja addresses are independent.</p>}
             <FormField id="devotee-address-1" label="Address line 1">
               <input className="form-control" id="devotee-address-1" value={addressLine1} onChange={(event) => setAddressLine1(event.target.value)} />
             </FormField>
@@ -565,6 +576,9 @@ export function DevoteeEditor({
                 <div className="review-row review-address-box">
                   <div>
                     <span>Primary address</span>
+                    <AddressVerificationBadge status={addressVerificationStatus} />
+                    {addressVerificationReason && <p>{addressVerificationReason}</p>}
+                    {!isNew && <p>{row.primaryAddressPoojaCount} active poojas use this primary address.</p>}
                     <address>
                       <strong>{addressLine1 || "Address not provided"}</strong>
                       {addressLine2 && <strong>{addressLine2}</strong>}

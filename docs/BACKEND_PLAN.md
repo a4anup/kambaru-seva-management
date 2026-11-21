@@ -470,3 +470,19 @@ The system is development-ready when:
 8. Secure CSV/PDF generation.
 9. Verify the Supabase-only runtime.
 10. Full automated checks and developer onboarding verification.
+
+
+## Address verification (21 Nov 2026)
+
+`20261121090000_address_verification.sql` adds constrained verification fields to
+primary/custom addresses, audited actor/time triggers, RPC payload support, bounded
+directory/register reads, resolved label statuses, and an immutable status snapshot
+for new occurrences. Existing addresses default to Verified; historical occurrence
+snapshots are untouched. See `PLAN.md` §5 for product semantics.
+
+Regression command: `npm test` (Node test runner, PGlite PostgreSQL integration tests,
+and Playwright component interaction tests). Install the test browser once with
+`npx playwright install chromium`. Browser tests mount the real components with
+synthetic Server Action responses; database tests exercise actual migrations, RPCs,
+RLS, and audit behavior under a minimal Supabase Auth scaffold. They do not replace
+an authenticated staging smoke test against Supabase.

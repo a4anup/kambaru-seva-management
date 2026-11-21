@@ -11,6 +11,8 @@ import type {
   ReportPage,
 } from "../types";
 import {
+  mapAddressVerification,
+  type AddressVerificationRow,
   mapBeneficiary,
   mapDevotee,
   mapEnrollment,
@@ -110,7 +112,7 @@ export function createSupabaseTempleRepository(
   return {
     async listDevoteesPage({ search, letter, page, pageSize }): Promise<DevoteeDirectoryPage> {
       const result = await callRpc<{
-        items: Array<DevoteeRow & { pooja_count: number }>;
+        items: Array<DevoteeRow & { pooja_count: number; primary_address_pooja_count: number }>;
         total: number;
         allTotal: number;
         letterCounts: Record<string, number>;
@@ -125,6 +127,7 @@ export function createSupabaseTempleRepository(
           const devotee = mapDevotee(row);
           const hasException = !devotee.phonePrimary || !devotee.addressLine1 || !devotee.addressCity || !/^\d{6}$/.test(devotee.addressPostalCode);
           return {
+            ...mapAddressVerification(row),
             id: devotee.id,
             devoteeNo: devotee.devoteeNo,
             fullName: devotee.fullName,
@@ -143,6 +146,7 @@ export function createSupabaseTempleRepository(
             state: devotee.addressState,
             postalCode: devotee.addressPostalCode || "PIN missing",
             poojaCount: Number(row.pooja_count),
+            primaryAddressPoojaCount: Number(row.primary_address_pooja_count),
             hasException,
             createdAt: devotee.createdAt,
             modifiedAt: devotee.modifiedAt,
@@ -155,7 +159,7 @@ export function createSupabaseTempleRepository(
     },
     async getDevoteeById(devoteeId) {
       const params = new URLSearchParams({ select: "*", id: `eq.${devoteeId}`, limit: "1" });
-      const [devoteeResponse, countResponse] = await Promise.all([
+      const [devoteeResponse, countResponse, primaryCountResponse] = await Promise.all([
         fetch(`${config.url}/rest/v1/devotees?${params}`, {
           headers: { apikey: config.anonKey, Authorization: `Bearer ${config.accessToken}` },
           cache: "no-store",
@@ -170,13 +174,19 @@ export function createSupabaseTempleRepository(
           },
           cache: "no-store",
         }),
+        fetch(`${config.url}/rest/v1/pooja_enrollments?select=id&devotee_id=eq.${encodeURIComponent(devoteeId)}&status=eq.active&address_mode=eq.devotee_primary`, {
+          method: "HEAD",
+          headers: { apikey: config.anonKey, Authorization: `Bearer ${config.accessToken}`, Prefer: "count=exact", Range: "0-0" },
+          cache: "no-store",
+        }),
       ]);
-      if (!devoteeResponse.ok || !countResponse.ok) throw new Error("Supabase devotee lookup failed.");
+      if (!devoteeResponse.ok || !countResponse.ok || !primaryCountResponse.ok) throw new Error("Supabase devotee lookup failed.");
       const row = ((await devoteeResponse.json()) as DevoteeRow[])[0];
       if (!row) return null;
       const devotee = mapDevotee(row);
       const count = Number(countResponse.headers.get("content-range")?.split("/")[1] ?? 0);
       return {
+        ...mapAddressVerification(row),
         id: devotee.id,
         devoteeNo: devotee.devoteeNo,
         fullName: devotee.fullName,
@@ -195,6 +205,7 @@ export function createSupabaseTempleRepository(
         state: devotee.addressState,
         postalCode: devotee.addressPostalCode || "PIN missing",
         poojaCount: count,
+        primaryAddressPoojaCount: Number(primaryCountResponse.headers.get("content-range")?.split("/")[1] ?? 0),
         hasException: !devotee.phonePrimary || !devotee.addressLine1 || !devotee.addressCity || !/^\d{6}$/.test(devotee.addressPostalCode),
         createdAt: devotee.createdAt,
         modifiedAt: devotee.modifiedAt,
@@ -202,6 +213,8 @@ export function createSupabaseTempleRepository(
     },
     async listPoojasPage({ mode, date, search, page, pageSize }): Promise<PageResult<PoojaRegisterRow>> {
       type JoinedRow = EnrollmentRow & {
+        devotee_address_verification_status: AddressVerificationRow["address_verification_status"];
+        devotee_address_verification_reason?: string;
         devotee_no: string;
         sponsor_name: string;
         phone_primary: string | null;
@@ -260,6 +273,8 @@ export function createSupabaseTempleRepository(
             annualMonth: row.annual_month,
             annualDay: row.annual_day,
             leapDayPolicy: row.leap_day_policy,
+            addressVerificationStatus: custom ? row.custom_address_verification_status : row.devotee_address_verification_status,
+            addressVerificationReason: (custom ? row.custom_address_verification_reason : row.devotee_address_verification_reason) ?? undefined,
             addressMode: row.address_mode,
             addressLine,
             addressLine2: custom ? row.custom_address_line2 : row.devotee_address_line2,
@@ -375,7 +390,7 @@ export function createSupabaseTempleRepository(
       }));
     },
     async listLabelRecipients({ mode, date, rangeFrom, rangeTo }): Promise<LabelRecipient[]> {
-      const rows = await callRpc<Array<{
+      const rows = await callRpc<Array<AddressVerificationRow & {
         id: string;
         name: string;
         phone: string | null;
@@ -394,6 +409,7 @@ export function createSupabaseTempleRepository(
         id: row.id,
         name: row.name,
         phone: row.phone,
+        ...mapAddressVerification(row),
         addressLine: row.address_line,
         addressLine2: row.address_line2 ?? undefined,
         city: row.city,
@@ -402,7 +418,7 @@ export function createSupabaseTempleRepository(
       }));
     },
     async listInvitationRecipients(scope): Promise<LabelRecipient[]> {
-      const rows = await callRpc<Array<{
+      const rows = await callRpc<Array<AddressVerificationRow & {
         id: string;
         name: string;
         phone: string | null;
@@ -416,6 +432,7 @@ export function createSupabaseTempleRepository(
         id: row.id,
         name: row.name,
         phone: row.phone,
+        ...mapAddressVerification(row),
         addressLine: row.address_line,
         addressLine2: row.address_line2 ?? undefined,
         city: row.city,

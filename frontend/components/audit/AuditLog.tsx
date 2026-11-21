@@ -30,12 +30,21 @@ const actionLabels: Record<string, string> = {
   unmapped: "Unmapped",
   reviewed: "Reviewed",
   review_required: "Review required",
+  address_verification_changed: "Address verification changed",
 };
 
 const fieldLabels: Record<string, string> = {
   full_name: "name",
   phone_primary: "phone",
   phone_alternate: "alternate phone",
+  address_verification_status: "address verification",
+  address_verification_reason: "verification reason",
+  address_verification_changed_at: "verification changed at",
+  address_verification_changed_by: "verification changed by",
+  custom_address_verification_status: "custom address verification",
+  custom_address_verification_reason: "custom verification reason",
+  custom_address_verification_changed_at: "custom verification changed at",
+  custom_address_verification_changed_by: "custom verification changed by",
   address_line1: "address",
   address_line2: "address line 2",
   address_city: "city",
@@ -125,6 +134,7 @@ export function AuditLog({ initialPage }: { initialPage: PageResult<AuditLogRow>
               <option value="updated">Updated</option>
               <option value="status_corrected">Status corrected</option>
               <option value="archived">Archived</option>
+              <option value="address_verification_changed">Address verification changed</option>
             </select>
           </label>
         </div>

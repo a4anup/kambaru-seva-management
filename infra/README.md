@@ -46,3 +46,27 @@ connected and restore testing can be automated.
 An `.env.example` (documenting `DATABASE_URL`, Supabase keys, etc. without real
 values) belongs here once phase 1b introduces them. Never commit a real `.env`
 — see `AGENTS.md` security rules.
+
+
+## Returned prasada / address verification
+
+- Open the devotee editor → Address to mark a primary address Unverified, or open
+  the pooja editor → Address for a custom address. Add an optional return reason.
+  Check the active linked-pooja count before saving a shared primary address.
+- Correct the address as needed. It stays Unverified until staff explicitly select
+  Verified. Verified means approved for dispatch, not confirmed delivery.
+- In Generate Labels, review the red Unverified address indicators. Remove labels
+  individually or choose Exclude all unverified. Restore removed reverses only
+  the current print selection. Included labels print normally without warning text.
+- Audit Log → Address verification changed identifies changes by actor and time.
+
+Release `20261121090000_address_verification.sql` before the frontend that consumes
+its fields. The migration is additive and defaults existing addresses to Verified;
+it does not rewrite prior occurrence records. Do not infer verification for old
+snapshots. After authorization to release, smoke-test primary/custom status changes,
+audit entries, and label selection on staging. Perform a printer check at 100% scale.
+
+Forward-fix is preferred. If reverting application code, retain the added columns
+and historical audit/snapshot data; do not drop them or mass-reset statuses. The
+verification triggers and old RPC callers are compatible with omitted input fields.
+Any database rollback or production migration needs separate authorization.

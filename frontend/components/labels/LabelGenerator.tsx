@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import type { LabelRecipient } from "@kambaru/backend";
 import {
+  TriangleAlert,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   Ruler,
   X,
 } from "lucide-react";
+import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { PageFooter } from "@/components/PageFooter";
 import { getInvitationLabels, getLabelsForDate } from "@/app/labels/actions";
@@ -189,6 +191,7 @@ export function LabelGenerator({
   // invitation modes, deduplicated) — never the whole devotee/enrollment tables.
   const [matchingRows, setMatchingRows] = useState<LabelRecipient[]>(initialRecipients);
   const [isPending, startTransition] = useTransition();
+  const [loadError, setLoadError] = useState<string>();
   const isFirstRun = useRef(true);
 
   useEffect(() => {
@@ -197,16 +200,18 @@ export function LabelGenerator({
       return;
     }
     let cancelled = false;
-    startTransition(() => {
-      const load = async () => {
+    startTransition(async () => {
+      setLoadError(undefined);
+      try {
         const rows = isInvitationChoice
           ? await getInvitationLabels(choice as "all" | "devotees" | "beneficiaries")
           : choice === "range"
             ? await getLabelsForDate({ mode: "range", rangeFrom, rangeTo })
             : await getLabelsForDate({ mode: choice, date: selectedDate });
         if (!cancelled) setMatchingRows(rows);
-      };
-      void load();
+      } catch {
+        if (!cancelled) setLoadError("Labels could not be loaded. Refresh and try again before printing.");
+      }
     });
     return () => {
       cancelled = true;
@@ -220,6 +225,7 @@ export function LabelGenerator({
   const invitationMenuRef = useRef<HTMLDetailsElement>(null);
   const removedIds = removedByDate[selectionKey] ?? [];
   const labels = matchingRows.filter((row) => !removedIds.includes(row.id));
+  const unverifiedCount = labels.filter((row) => row.addressVerificationStatus === "unverified").length;
   const pages = chunk(labels, labelsPerPage);
   const visiblePage = Math.min(previewPage, Math.max(1, pages.length));
 
@@ -228,6 +234,14 @@ export function LabelGenerator({
       ...current,
       [selectionKey]: [...(current[selectionKey] ?? []), id],
     }));
+  }
+
+  function excludeUnverified() {
+    setRemovedByDate((current) => ({
+      ...current,
+      [selectionKey]: Array.from(new Set([...(current[selectionKey] ?? []), ...matchingRows.filter((row) => row.addressVerificationStatus === "unverified").map((row) => row.id)])),
+    }));
+    setPreviewPage(1);
   }
 
   function restoreLabels() {
@@ -266,11 +280,12 @@ export function LabelGenerator({
           <h1>Generate Labels</h1>
           <p>Generate daily dispatch labels or a deduplicated invitation list for every devotee and beneficiary address.</p>
         </div>
-        <Button onClick={() => window.print()} disabled={labels.length === 0}>
+        <Button onClick={() => window.print()} disabled={isPending || Boolean(loadError) || labels.length === 0}>
           <Printer size={18} /> Print {labels.length} {labels.length === 1 ? "Label" : "Labels"}
         </Button>
       </div>
 
+      {loadError && <Alert tone="danger" role="alert">{loadError}</Alert>}
       <div className="label-workspace">
         <aside className="panel label-filter-column" aria-label="Label date filter">
           <header><span className="eyebrow">Date filter</span><strong>Choose pooja dates</strong></header>
@@ -368,6 +383,12 @@ export function LabelGenerator({
           </div>
         </details>
 
+        <div className="address-verification-print-warning" role="status" aria-live="polite">
+          {unverifiedCount > 0 && <>
+            <p><TriangleAlert size={18} aria-hidden="true" /> {unverifiedCount} selected {unverifiedCount === 1 ? "label has an unverified address" : "labels have unverified addresses"}. Review before printing.</p>
+            <Button variant="outline" onClick={excludeUnverified}>Exclude all unverified</Button>
+          </>}
+        </div>
         {removedIds.length > 0 && (
           <Button variant="ghost" onClick={restoreLabels}>
             <RotateCcw size={16} /> Restore removed
@@ -442,7 +463,7 @@ export function LabelGenerator({
                 const row = page[slotIndex];
                 if (!row) return <div className="courier-label is-empty" key={`blank-${slotIndex}`} aria-hidden="true" />;
                 return (
-                  <article className="courier-label" key={row.id}>
+                  <article className={`courier-label ${row.addressVerificationStatus === "unverified" ? "is-unverified" : ""}`} key={row.id}>
                     <button
                       className="label-remove-button"
                       type="button"
@@ -452,7 +473,9 @@ export function LabelGenerator({
                     >
                       <X size={16} />
                     </button>
-                    <strong>{row.name}</strong>
+                    <strong>{row.name}
+                      {row.addressVerificationStatus === "unverified" && <span className="label-verification-warning"><TriangleAlert size={14} aria-hidden="true" /> Unverified address</span>}
+                    </strong>
                     <address>
                       <span>
                         {[row.addressLine, row.addressLine2, row.city, row.state].filter(Boolean).join(", ") || "Address unavailable"}

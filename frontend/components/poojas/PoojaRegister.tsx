@@ -1,5 +1,6 @@
 "use client";
 
+import { AddressVerificationBadge, AddressVerificationField } from "@/components/AddressVerificationField";
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -400,6 +401,7 @@ export function PoojaRegister({
                   </span>
                   <span className="pooja-list-address">
                     {[row.addressCity, row.postalCode].filter(Boolean).join(" — ") || "Address missing"}
+                    {row.addressVerificationStatus === "unverified" && <AddressVerificationBadge status="unverified" />}
                   </span>
                   <span className="pooja-row-actions">
                     <Button className="pooja-row-edit" variant="outline" onClick={() => setSelected(row)}>
@@ -452,6 +454,8 @@ export function PoojaRegister({
               sponsorName: updated.fullName,
               phone: updated.phone,
               ...(item.addressMode === "devotee_primary" ? {
+                addressVerificationStatus: updated.addressVerificationStatus,
+                addressVerificationReason: updated.addressVerificationReason,
                 addressLine: updated.addressLine1,
                 addressLine2: updated.addressLine2,
                 addressCity: updated.city,
@@ -632,6 +636,8 @@ function PoojaEditor({
   );
   const [status, setStatus] = useState<EnrollmentStatus>(row.status);
   const [addressMode, setAddressMode] = useState(row.addressMode);
+  const [customAddressVerificationStatus, setCustomAddressVerificationStatus] = useState(row.addressMode === "custom" ? row.addressVerificationStatus : "verified");
+  const [customAddressVerificationReason, setCustomAddressVerificationReason] = useState(row.addressMode === "custom" ? row.addressVerificationReason ?? "" : "");
   const [addressLine, setAddressLine] = useState(row.addressLine);
   const [addressLine2, setAddressLine2] = useState(row.addressLine2 ?? "");
   const [addressCity, setAddressCity] = useState(row.addressCity);
@@ -740,6 +746,8 @@ function PoojaEditor({
         annualDay: parsedDate.getDate(),
         status,
         addressMode,
+        customAddressVerificationStatus: addressMode === "custom" ? customAddressVerificationStatus : undefined,
+        customAddressVerificationReason: addressMode === "custom" ? customAddressVerificationReason : undefined,
         customAddress: addressMode === "custom" ? {
           line1: addressLine,
           line2: addressLine2,
@@ -786,6 +794,7 @@ function PoojaEditor({
               <button
                 className={editStep === index + 1 ? "active" : editStep > index + 1 ? "complete" : ""}
                 key={label}
+                aria-label={label}
                 onClick={() => { setEditStep(index + 1); setError(undefined); }}
                 type="button"
                 aria-current={editStep === index + 1 ? "step" : undefined}
@@ -880,6 +889,8 @@ function PoojaEditor({
                 <div className="modal-created-summary devotee-primary-address-summary">
                   <div>
                     <span>Devotee primary address</span>
+                    <AddressVerificationBadge status={linkedDevotee?.addressVerificationStatus ?? row.addressVerificationStatus} />
+                    <small>To change verification for this shared address, edit the devotee profile.</small>
                     <strong>This pooja will follow {sponsorName}&apos;s current primary address. The linked devotee cannot be changed while editing a pooja.</strong>
                     {primaryAddress ? (
                       <address>
@@ -893,6 +904,7 @@ function PoojaEditor({
                 </div>
               ) : (
                 <div className="pooja-custom-address-editor">
+                  <AddressVerificationField id="custom-address-verification" status={customAddressVerificationStatus} reason={customAddressVerificationReason} onStatusChange={setCustomAddressVerificationStatus} onReasonChange={setCustomAddressVerificationReason} />
                   <FormField id="address-line" label="Custom address line 1"><input className="form-control" id="address-line" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></FormField>
                   <FormField id="address-line-2" label="Address line 2"><input className="form-control" id="address-line-2" value={addressLine2} onChange={(event) => setAddressLine2(event.target.value)} /></FormField>
                   <div className="pooja-editor-grid">
@@ -917,6 +929,8 @@ function PoojaEditor({
                 <div className="wide"><span>Spiritual details</span><strong>{[beneficiaryRashi, beneficiaryNakshatra, beneficiaryGotra].filter(Boolean).join(" · ") || "Not provided"}</strong></div>
                 <div className="wide pooja-review-address">
                   <span>Dispatch address</span>
+                  <AddressVerificationBadge status={addressMode === "custom" ? customAddressVerificationStatus : linkedDevotee?.addressVerificationStatus ?? row.addressVerificationStatus} />
+                  {addressMode === "custom" && customAddressVerificationReason && <small>{customAddressVerificationReason}</small>}
                   <strong>{addressMode === "devotee_primary" ? `Devotee primary address · follows ${sponsorName}'s profile` : "Custom address for this pooja"}</strong>
                   {addressMode === "devotee_primary" ? (
                     primaryAddress ? (
@@ -1220,6 +1234,7 @@ function AddPoojaModal({
               <button
                 className={poojaStep === index + 1 ? "active" : poojaStep > index + 1 ? "complete" : ""}
                 key={label}
+                aria-label={label}
                 onClick={() => {
                   if (index === 0 || poojaStep > 1) {
                     setPoojaStep(index + 1);
@@ -1322,6 +1337,7 @@ function AddPoojaModal({
                     <button
                       className={newDevoteeStep === index + 1 ? "active" : newDevoteeStep > index + 1 ? "complete" : ""}
                       key={label}
+                aria-label={label}
                       onClick={() => { setNewDevoteeStep(index + 1); setError(undefined); }}
                       type="button"
                       aria-current={newDevoteeStep === index + 1 ? "step" : undefined}
@@ -1606,6 +1622,7 @@ function AddPoojaModal({
               <div className="modal-created-summary">
                 <div>
                   <span>Devotee primary address</span>
+                  <AddressVerificationBadge status={selectedDevotee?.addressVerificationStatus ?? "verified"} />
                   <strong>
                     {[selectedDevotee?.addressLine1 ?? addressLine, selectedDevotee?.addressLine2 ?? addressLine2, selectedDevotee?.city ?? city, selectedDevotee?.state ?? state, selectedDevotee?.postalCode ?? postalCode]
                       .filter(Boolean)

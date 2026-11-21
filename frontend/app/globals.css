@@ -1143,3 +1143,9 @@ td.addr small {
   color: var(--ink);
   margin-bottom: 0.5rem;
 }
+
+/* Address status is semantic: returned courier warnings use kumkum. */
+.status-unverified { color: var(--color-kumkum); background: var(--color-kumkum-soft); }
+.status-verified { color: var(--color-success); background: var(--color-success-soft); }
+.address-verification-fields { display: grid; gap: var(--space-3); }
+.address-verification-fields > small { color: var(--color-text-secondary); }

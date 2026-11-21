@@ -18,6 +18,8 @@ const devoteeInput = z.object({
   nakshatra: z.string().trim().max(100).optional().transform((value) => value || undefined),
   gotra: z.string().trim().max(100).optional().transform((value) => value || undefined),
   notes: optionalText,
+  addressVerificationStatus: z.enum(["verified", "unverified"]).optional(),
+  addressVerificationReason: z.string().trim().max(500).optional(),
   addressLine1: z.string().trim().max(250).optional().transform((value) => value || undefined),
   addressLine2: z.string().trim().max(250).optional().transform((value) => value || undefined),
   city: z.string().trim().max(120).optional().transform((value) => value || undefined),
@@ -77,6 +79,7 @@ export async function saveDevotee(input: unknown): Promise<SaveDevoteeResult> {
     revalidatePath("/poojas");
     revalidatePath("/reports");
     revalidatePath("/labels");
+    revalidatePath("/audit");
     return { ok: true, devotee };
   } catch (error) {
     if (error instanceof Error && error.message === "CONFLICT") {

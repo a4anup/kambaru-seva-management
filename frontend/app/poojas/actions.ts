@@ -27,6 +27,8 @@ const newDevotee = z.object({
   nakshatra: optionalText(100),
   gotra: optionalText(100),
   notes: optionalText(1000),
+  addressVerificationStatus: z.enum(["verified", "unverified"]).optional(),
+  addressVerificationReason: z.string().trim().max(500).optional(),
   addressLine1: optionalText(250),
   addressLine2: optionalText(250),
   city: optionalText(120),
@@ -44,6 +46,8 @@ const enrollment = z.object({
   annualMonth: z.number().int().min(1).max(12),
   annualDay: z.number().int().min(1).max(31),
   addressMode: z.enum(["devotee_primary", "custom"]),
+  customAddressVerificationStatus: z.enum(["verified", "unverified"]).optional(),
+  customAddressVerificationReason: z.string().trim().max(500).optional(),
   customAddress: z.object({
     line1: optionalText(250),
     line2: optionalText(250),
@@ -123,6 +127,7 @@ export async function savePooja(input: unknown): Promise<SavePoojaResult> {
     revalidatePath("/devotees");
     revalidatePath("/reports");
     revalidatePath("/labels");
+    revalidatePath("/audit");
     return { ok: true, pooja };
   } catch (error) {
     if (error instanceof Error && error.message === "CONFLICT") {
@@ -145,6 +150,7 @@ export async function archivePooja(enrollmentId: string, expectedModifiedAt: str
     revalidatePath("/devotees");
     revalidatePath("/reports");
     revalidatePath("/labels");
+    revalidatePath("/audit");
     revalidatePath("/audit");
     return { ok: true as const };
   } catch (error) {

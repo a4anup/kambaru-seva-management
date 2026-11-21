@@ -177,6 +177,42 @@ This two-way choice is what satisfies both requirements at once: address changes
 propagate at the devotee level by default, *and* any individual pooja can be pinned
 to a different address without an address book, labels, or a "copy address" step.
 
+### Address verification — dispatch approval
+
+Each devotee primary address and each custom enrollment address independently has
+`verified` / `unverified` status. **Verified means approved for dispatch**, not proof
+of delivery. New addresses and existing addresses at migration default to Verified.
+Staff manually mark an address Unverified after a returned courier, optionally
+recording a reason (maximum 500 characters). Address corrections and unrelated
+profile edits preserve the status until staff explicitly change it again.
+
+Enrollments using `devotee_primary` dynamically inherit the devotee address status;
+custom addresses remain independent. Before saving a primary address/status change,
+show how many active enrollments use that primary address. Status/reason changes
+record authenticated actor, time, before/after values, and an append-only Audit Log
+event transactionally. Use optimistic concurrency on the owning record.
+
+Unverified addresses remain eligible for pooja and labels. Label preparation shows
+a kumkum red border, warning icon, and “Unverified address” text, plus the number of
+selected unverified labels. Staff may remove individual labels, exclude all
+unverified labels, or restore removed labels. Exclusion affects the current print
+selection only; it never changes an enrollment, address status, or dispatch status.
+Warnings are screen-only; included labels print with the existing normal appearance
+and geometry. Failed/loading label reads cannot be printed through the Print button.
+
+These rules apply to date/range and invitation labels. Invitation deduplication must
+retain an Unverified warning if any candidate for the same normalized address is
+unverified, regardless of which recipient is chosen for display. Newly generated
+occurrences capture the resolved verification status immutably; old occurrences
+keep their historical addresses and have no inferred verification status. Current
+label preparation reads current addresses/status independently of those snapshots.
+
+Acceptance criteria: default Verified; primary inheritance/custom isolation;
+corrections preserve Unverified; explicit re-verification removes warnings; manual
+and bulk exclusions restore correctly and repack pages; invitation deduplication
+preserves warnings; snapshots remain frozen; unauthorized/deactivated users cannot
+read or mutate verification; audit and record writes succeed or roll back together.
+
 ### Annual Pooja Enrollment
 Connects: sponsoring devotee → beneficiary (self, or an existing/new saved
 beneficiary under that devotee) → annual date → delivery address (primary or
@@ -398,6 +434,8 @@ Devotee                                              (the "customer")
   email, rashi, nakshatra, gotra, notes,
   address_line1, address_line2, address_city, address_district, address_state,
   address_postal_code                  (one saved primary address, inline),
+  address_verification_status (verified|unverified, default verified),
+  address_verification_reason, address_verification_changed_at/by,
   archived_at, created_at, modified_at
 
 Beneficiary                        (saved under one devotee, reusable across their poojas)
@@ -415,6 +453,8 @@ PoojaEnrollment                                      (the "order")
   address_mode              enum: devotee_primary | custom
   custom_address_line1, custom_address_line2, custom_address_city,
   custom_address_district, custom_address_state, custom_address_postal_code
+  custom_address_verification_status (verified|unverified, default verified),
+  custom_address_verification_reason, custom_address_verification_changed_at/by,
   status (active|paused|cancelled),
   fee_minor, currency, payment_reference, enrollment_date, notes, created_by,
   created_at, modified_at
@@ -422,6 +462,7 @@ PoojaEnrollment                                      (the "order")
 PoojaOccurrence            (generated/reconciled per enrollment per calendar date)
   id, enrollment_id → PoojaEnrollment, service_date,
   recipient_name_snapshot, address_snapshot_json,
+  address_verification_status_snapshot (nullable for occurrences created before this feature),
   operational_status (pending|prepared|packed|dispatched|exception),
   generated_at
 

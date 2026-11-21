@@ -8,6 +8,8 @@ function directoryRow(devotee: Devotee, poojaCount: number): DevoteeDirectoryRow
     !devotee.addressCity ||
     !/^\d{6}$/.test(devotee.addressPostalCode);
   return {
+    addressVerificationStatus: devotee.addressVerificationStatus,
+    addressVerificationReason: devotee.addressVerificationReason,
     id: devotee.id,
     devoteeNo: devotee.devoteeNo,
     fullName: devotee.fullName,
@@ -26,6 +28,7 @@ function directoryRow(devotee: Devotee, poojaCount: number): DevoteeDirectoryRow
     state: devotee.addressState,
     postalCode: devotee.addressPostalCode || "PIN missing",
     poojaCount,
+    primaryAddressPoojaCount: 0,
     hasException,
     createdAt: devotee.createdAt,
     modifiedAt: devotee.modifiedAt,

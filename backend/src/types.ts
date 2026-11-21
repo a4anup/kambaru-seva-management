@@ -10,9 +10,19 @@ export type BeneficiaryRelation =
   | "mother"
   | "other";
 
+/** Verified means approved for dispatch, not confirmed courier delivery. */
+export type AddressVerificationStatus = "verified" | "unverified";
+
+export interface AddressVerification {
+  addressVerificationStatus: AddressVerificationStatus;
+  addressVerificationReason?: string;
+  addressVerificationChangedAt?: string;
+  addressVerificationChangedBy?: string;
+}
+
 export type EnrollmentStatus = "active" | "paused" | "cancelled";
 
-export interface Devotee {
+export interface Devotee extends AddressVerification {
   id: string;
   devoteeNo: string;
   fullName: string;
@@ -57,6 +67,8 @@ export interface PoojaEnrollment {
   annualMonth: number; // 1-12
   annualDay: number; // 1-31
   addressMode: "devotee_primary" | "custom";
+  customAddressVerificationStatus?: AddressVerificationStatus;
+  customAddressVerificationReason?: string;
   customAddress?: {
     line1: string;
     line2?: string;
@@ -99,7 +111,7 @@ export interface DaySummary {
 }
 
 /** Display/edit shape for the date-filtered Shashwatha Pooja register. */
-export interface PoojaRegisterRow {
+export interface PoojaRegisterRow extends AddressVerification {
   enrollmentId: string;
   poojaNo: string;
   devoteeId: string;
@@ -138,7 +150,7 @@ export interface PoojaRegisterRow {
 }
 
 /** Summary row for the alphabet-filtered devotee directory. */
-export interface DevoteeDirectoryRow {
+export interface DevoteeDirectoryRow extends AddressVerification {
   id: string;
   devoteeNo: string;
   fullName: string;
@@ -157,12 +169,15 @@ export interface DevoteeDirectoryRow {
   state: string;
   postalCode: string;
   poojaCount: number;
+  primaryAddressPoojaCount: number;
   hasException: boolean;
   createdAt: string;
   modifiedAt: string;
 }
 
 export interface SaveDevoteeInput {
+  addressVerificationStatus?: AddressVerificationStatus;
+  addressVerificationReason?: string;
   id?: string;
   expectedModifiedAt?: string;
   fullName: string;
@@ -203,6 +218,8 @@ export interface SaveEnrollmentInput {
   annualMonth: number;
   annualDay: number;
   addressMode: "devotee_primary" | "custom";
+  customAddressVerificationStatus?: AddressVerificationStatus;
+  customAddressVerificationReason?: string;
   customAddress?: {
     line1?: string;
     line2?: string;
@@ -256,7 +273,7 @@ export interface AuditLogRow {
 }
 
 /** A single deduplicated courier-label recipient (used by both date-based and bulk invitation label modes). */
-export interface LabelRecipient {
+export interface LabelRecipient extends AddressVerification {
   id: string;
   name: string;
   phone: string | null;

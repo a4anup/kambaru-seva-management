@@ -1,6 +1,22 @@
 import type { Beneficiary, Devotee, PoojaEnrollment } from "../types";
 
-export interface DevoteeRow {
+export interface AddressVerificationRow {
+  address_verification_status: Devotee["addressVerificationStatus"];
+  address_verification_reason?: string;
+  address_verification_changed_at?: string;
+  address_verification_changed_by?: string;
+}
+
+export function mapAddressVerification(row: AddressVerificationRow) {
+  return {
+    addressVerificationStatus: row.address_verification_status,
+    addressVerificationReason: row.address_verification_reason ?? undefined,
+    addressVerificationChangedAt: row.address_verification_changed_at ?? undefined,
+    addressVerificationChangedBy: row.address_verification_changed_by ?? undefined,
+  };
+}
+
+export interface DevoteeRow extends AddressVerificationRow {
   id: string;
   devotee_no: string;
   full_name: string;
@@ -46,6 +62,8 @@ export interface EnrollmentRow {
   annual_day: number;
   leap_day_policy: PoojaEnrollment["leapDayPolicy"];
   address_mode: PoojaEnrollment["addressMode"];
+  custom_address_verification_status: Devotee["addressVerificationStatus"];
+  custom_address_verification_reason?: string;
   custom_address_line1?: string;
   custom_address_line2?: string;
   custom_address_city?: string;
@@ -69,6 +87,7 @@ export function mapDevotee(row: DevoteeRow): Devotee {
   return {
     id: row.id,
     devoteeNo: row.devotee_no,
+    ...mapAddressVerification(row),
     fullName: row.full_name,
     dateOfBirth: row.date_of_birth,
     phonePrimary: row.phone_primary,
@@ -117,6 +136,8 @@ export function mapEnrollment(row: EnrollmentRow): PoojaEnrollment & { exception
     annualDay: row.annual_day,
     leapDayPolicy: row.leap_day_policy,
     addressMode: row.address_mode,
+    customAddressVerificationStatus: row.custom_address_verification_status,
+    customAddressVerificationReason: row.custom_address_verification_reason,
     customAddress: hasCustomAddress
       ? {
           line1: row.custom_address_line1 ?? "",
